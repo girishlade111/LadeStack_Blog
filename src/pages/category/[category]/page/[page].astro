@@ -1,0 +1,34 @@
+---
+import { CATEGORY_IDS, type CategoryId } from '../../../../data/categories';
+import { SITE_CONFIG } from '../../../../data/site';
+import { getCategoryPosts } from '../../../../lib/posts';
+import CategoryArchiveView from '../../../../components/views/CategoryArchiveView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { category: string; page: string };
+    props: { categoryId: CategoryId; page: number };
+  }[] = [];
+
+  for (const categoryId of CATEGORY_IDS) {
+    const total = getCategoryPosts(categoryId, 'en').length;
+    const totalPages = Math.ceil(total / SITE_CONFIG.postsPerPage);
+    for (let page = 2; page <= Math.max(2, totalPages); page++) {
+      paths.push({
+        params: { category: categoryId, page: String(page) },
+        props: { categoryId, page },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  categoryId: CategoryId;
+  page: number;
+}
+
+const { categoryId, page } = Astro.props;
+---
+
+<CategoryArchiveView locale="en" categoryId={categoryId} page={page} />

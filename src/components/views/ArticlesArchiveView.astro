@@ -1,0 +1,87 @@
+---
+import type { Locale } from '../../data/locales';
+import { SITE_CONFIG } from '../../data/site';
+import { getDictionary } from '../../i18n';
+import { getHomeUrl, getArticlesUrl } from '../../i18n/urls';
+import { getPublishedPosts } from '../../lib/posts';
+import { paginateItems } from '../../lib/pagination';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildStaticPageAlternates } from '../../lib/seo';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../editorial/ArticleCard.astro';
+
+interface Props {
+  locale: Locale;
+  page?: number;
+}
+
+const { locale, page = 1 } = Astro.props;
+const dict = getDictionary(locale);
+const allPosts = getPublishedPosts(locale);
+const pagination = paginateItems(allPosts, page, SITE_CONFIG.postsPerPage);
+
+const canonicalPath = getArticlesUrl(locale, pagination.currentPage);
+const alternates = buildStaticPageAlternates((loc) => getArticlesUrl(loc, 1));
+const localeOptions = buildLocaleSwitchOptions(locale, {
+  staticRoute: 'articles',
+});
+---
+
+<BaseLayout
+  locale={locale}
+  title={dict.allArticlesTitle}
+  description={dict.allArticlesDescription}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{dict.navArticles}</span>
+      </nav>
+      <h1 class="masthead-title">{dict.allArticlesTitle} ({allPosts.length})</h1>
+      <p class="masthead-subtitle">{dict.allArticlesDescription}</p>
+    </div>
+  </section>
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container">
+      <div class="articles-grid">
+        {pagination.items.map((entry) => <ArticleCard entry={entry} />)}
+      </div>
+
+      {
+        pagination.totalPages > 1 && (
+          <nav class="pagination-nav" aria-label="Pagination">
+            {pagination.hasPrev ? (
+              <a
+                href={getArticlesUrl(locale, pagination.currentPage - 1)}
+                class="theme-cycle-btn"
+              >
+                ← {dict.paginationPrev}
+              </a>
+            ) : (
+              <span />
+            )}
+            <span>
+              {dict.paginationPageOf} {pagination.currentPage} / {pagination.totalPages}
+            </span>
+            {pagination.hasNext ? (
+              <a
+                href={getArticlesUrl(locale, pagination.currentPage + 1)}
+                class="theme-cycle-btn"
+              >
+                {dict.paginationNext} →
+              </a>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )
+      }
+    </div>
+  </section>
+</BaseLayout>

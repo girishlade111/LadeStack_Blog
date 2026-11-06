@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-label="Thermodynamic cycle efficiency chart comparing pumped hydro, compressed air, and thermal brick grid storage">
+  <rect width="1280" height="720" fill="#F1F2EF"/>
+  <rect x="48" y="48" width="1184" height="624" rx="12" fill="#FAFAF8" stroke="#DCE1DC" stroke-width="2"/>
+  <text x="96" y="114" font-family="monospace" font-size="16" fill="#315F4E" letter-spacing="2">FIG 02 · LONG-DURATION GRID STORAGE ROUND-TRIP EFFICIENCY</text>
+  <line x1="96" y1="150" x2="1184" y2="150" stroke="#DCE1DC" stroke-width="1.5"/>
+  <g font-family="system-ui, sans-serif" font-size="18" fill="#1B201D">
+    <text x="96" y="245" font-weight="600">Pumped Hydroelectric (PHS)</text>
+    <rect x="420" y="220" width="620" height="36" rx="4" fill="#315F4E"/>
+    <text x="1060" y="245" font-family="monospace" font-weight="700">78–82%</text>
+
+    <text x="96" y="345" font-weight="600">Lithium-Iron-Phosphate (4h BESS)</text>
+    <rect x="420" y="320" width="680" height="36" rx="4" fill="#1B201D"/>
+    <text x="1118" y="345" font-family="monospace" font-weight="700">86–89%</text>
+
+    <text x="96" y="445" font-weight="600">Adiabatic Compressed Air (A-CAES)</text>
+    <rect x="420" y="420" width="510" height="36" rx="4" fill="#5D6860"/>
+    <text x="950" y="445" font-family="monospace" font-weight="700">64–70%</text>
+
+    <text x="96" y="545" font-weight="600">Refractory Thermal Brick (Industrial Heat)</text>
+    <rect x="420" y="520" width="710" height="36" rx="4" fill="#315F4E" opacity="0.85"/>
+    <text x="1145" y="545" font-family="monospace" font-weight="700">90%+ (Thermal)</text>
+  </g>
+</svg>

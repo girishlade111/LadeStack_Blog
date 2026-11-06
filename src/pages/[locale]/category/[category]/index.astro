@@ -1,0 +1,31 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../../../data/locales';
+import { CATEGORY_IDS, type CategoryId } from '../../../../data/categories';
+import CategoryArchiveView from '../../../../components/views/CategoryArchiveView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { locale: string; category: string };
+    props: { locale: Locale; categoryId: CategoryId };
+  }[] = [];
+
+  for (const locale of NON_DEFAULT_LOCALES) {
+    for (const categoryId of CATEGORY_IDS) {
+      paths.push({
+        params: { locale, category: categoryId },
+        props: { locale, categoryId },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  locale: Locale;
+  categoryId: CategoryId;
+}
+
+const { locale, categoryId } = Astro.props;
+---
+
+<CategoryArchiveView locale={locale} categoryId={categoryId} page={1} />

@@ -1,0 +1,394 @@
+---
+import { LOCALE_REGISTRY } from '../../data/locales';
+import { getCategoryMeta } from '../../data/categories';
+import { AUTHOR_REGISTRY } from '../../data/site';
+import { formatDate, getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getPostUrl,
+  getCategoryUrl,
+  getTagUrl,
+  buildCanonicalUrl,
+} from '../../i18n/urls';
+import { getRelatedPosts } from '../../lib/posts';
+import {
+  getAvailableTranslations,
+  buildLocaleSwitchOptions,
+} from '../../lib/translations';
+import {
+  buildArticleAlternates,
+  buildArticleJsonLd,
+  buildBreadcrumbJsonLd,
+} from '../../lib/seo';
+import type { BlogEntry } from '../../lib/validators';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleTOC from '../article/ArticleTOC.astro';
+import ArticleCard from '../editorial/ArticleCard.astro';
+
+interface Props {
+  entry: BlogEntry;
+}
+
+const { entry } = Astro.props;
+const locale = entry.data.lang;
+const dict = getDictionary(locale);
+const categoryMeta = getCategoryMeta(entry.data.category, locale);
+const author = AUTHOR_REGISTRY[entry.data.authorId];
+
+const canonicalPath = getPostUrl(locale, entry.data.slug);
+const canonicalFullUrl = buildCanonicalUrl(canonicalPath);
+const alternates = buildArticleAlternates(entry.data.translationKey);
+const availableTranslations = getAvailableTranslations(entry);
+const localeOptions = buildLocaleSwitchOptions(locale, {
+  translationKey: entry.data.translationKey,
+});
+const relatedPosts = getRelatedPosts(entry, 3);
+
+const crumbs = [
+  { label: dict.breadcrumbHome, href: getHomeUrl(locale) },
+  {
+    label: categoryMeta.label,
+    href: getCategoryUrl(locale, entry.data.category),
+  },
+  { label: entry.data.title, href: canonicalPath },
+];
+
+const jsonLd = [
+  buildArticleJsonLd(entry),
+  buildBreadcrumbJsonLd(crumbs),
+];
+---
+
+<BaseLayout
+  locale={locale}
+  title={entry.data.title}
+  description={entry.data.description}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+  ogType="article"
+  ogImage={entry.data.coverImage}
+  publishedTime={entry.data.publishedAt.toISOString()}
+  modifiedTime={(entry.data.updatedAt ?? entry.data.publishedAt).toISOString()}
+  noindex={entry.data.noindex}
+  jsonLd={jsonLd}
+>
+  <div class="reading-progress-bar" aria-hidden="true">
+    <div class="reading-progress-fill" data-reading-progress></div>
+  </div>
+
+  <article class="article-page-wrapper" data-pagefind-body>
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb" data-pagefind-ignore>
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <a href={getCategoryUrl(locale, entry.data.category)}>
+          {categoryMeta.label}
+        </a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{entry.data.title}</span>
+      </nav>
+
+      <header class="article-header">
+        <div class="metadata-line">
+          <a
+            href={getCategoryUrl(locale, entry.data.category)}
+            class="metadata-category-link"
+            data-pagefind-meta="category"
+          >
+            {categoryMeta.label}
+          </a>
+          <span class="metadata-sep" aria-hidden="true">·</span>
+          <span>
+            {dict.publishedOn}{' '}
+            <time datetime={entry.data.publishedAt.toISOString()}>
+              {formatDate(entry.data.publishedAt, locale)}
+            </time>
+          </span>
+          {
+            entry.data.updatedAt && (
+              <>
+                <span class="metadata-sep" aria-hidden="true">·</span>
+                <span>
+                  {dict.updatedOn}{' '}
+                  <time datetime={entry.data.updatedAt.toISOString()}>
+                    {formatDate(entry.data.updatedAt, locale)}
+                  </time>
+                </span>
+              </>
+            )
+          }
+          <span class="metadata-sep" aria-hidden="true">·</span>
+          <span>{entry.readingTimeMinutes} {dict.readingTimeMinutes}</span>
+        </div>
+
+        <h1 class="article-h1">{entry.data.title}</h1>
+        <p class="article-deck">{entry.data.summary || entry.data.description}</p>
+
+        <div class="article-byline-bar" data-pagefind-ignore>
+          <div>
+            <strong>{author?.name ?? entry.data.authorId}</strong>
+            {
+              author?.role[locale] && (
+                <span> · {author.role[locale]}</span>
+              )
+            }
+          </div>
+
+          <button
+            type="button"
+            class="theme-cycle-btn"
+            data-copy-canonical={canonicalFullUrl}
+            data-copied-text={dict.linkCopiedLabel}
+            aria-label={dict.copyLinkLabel}
+          >
+            <span data-copy-label>{dict.copyLinkLabel}</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="article-layout-grid">
+        <div>
+          {
+            entry.data.coverImage && (
+              <figure class="article-cover-figure">
+                <div class="article-cover-frame">
+                  <img
+                    src={entry.data.coverImage}
+                    alt={entry.data.coverAlt || entry.data.title}
+                    width="960"
+                    height="540"
+                    fetchpriority="high"
+                  />
+                </div>
+                {entry.data.coverCredit && (
+                  <figcaption class="article-cover-caption">
+                    {entry.data.coverCredit}
+                  </figcaption>
+                )}
+              </figure>
+            )
+          }
+
+          <div data-pagefind-ignore>
+            <ArticleTOC
+              headings={entry.headings}
+              locale={locale}
+              mode="mobile"
+            />
+          </div>
+
+          <div
+            class="article-prose"
+            data-article-body
+            set:html={entry.html}
+          />
+
+          {
+            entry.data.sources.length > 0 && (
+              <section class="article-supplementary-box" aria-labelledby="sources-heading">
+                <h2 id="sources-heading" class="supplementary-heading">
+                  {dict.sourcesHeading}
+                </h2>
+                <ol class="sources-list">
+                  {entry.data.sources.map((src) => (
+                    <li>
+                      <a href={src.url} rel="noopener noreferrer" target="_blank">
+                        {src.label}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )
+          }
+
+          {
+            entry.data.tags.length > 0 && (
+              <section
+                class="article-supplementary-box"
+                aria-labelledby="tags-heading"
+                data-pagefind-ignore
+              >
+                <h2 id="tags-heading" class="supplementary-heading">
+                  {dict.tagsHeading}
+                </h2>
+                <ul class="tags-inline-list">
+                  {entry.data.tags.map((tag) => (
+                    <li>
+                      <a href={getTagUrl(locale, tag)} class="tag-item-link">
+                        #{tag}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          }
+
+          <section
+            class="article-supplementary-box"
+            aria-labelledby="editions-heading"
+            data-pagefind-ignore
+          >
+            <h2 id="editions-heading" class="supplementary-heading">
+              {dict.availableLanguagesHeading} ({availableTranslations.length})
+            </h2>
+            <p style="margin:0 0 12px; font-size:0.8125rem; color:var(--text-muted);">
+              {dict.translationUnavailableNote}
+            </p>
+            <ul class="translations-inline-list">
+              {
+                availableTranslations.map((variant) => {
+                  const info = LOCALE_REGISTRY[variant.locale];
+                  return (
+                    <li>
+                      <a
+                        href={variant.url}
+                        hreflang={variant.locale}
+                        lang={variant.locale}
+                        class="translation-edition-link"
+                        aria-current={variant.locale === locale ? 'page' : undefined}
+                      >
+                        <span>{info.nativeName}</span>
+                        <span class="locale-code-tag">{variant.locale.toUpperCase()}</span>
+                      </a>
+                    </li>
+                  );
+                })
+              }
+            </ul>
+          </section>
+        </div>
+
+        <div data-pagefind-ignore>
+          <ArticleTOC
+            headings={entry.headings}
+            locale={locale}
+            mode="desktop"
+          />
+        </div>
+      </div>
+
+      {
+        relatedPosts.length > 0 && (
+          <section
+            class="editorial-section"
+            style="border-bottom:none; margin-top:44px; padding-bottom:0;"
+            data-pagefind-ignore
+          >
+            <div class="section-header-row">
+              <h2 class="section-heading">{dict.relatedArticlesHeading}</h2>
+            </div>
+            <div class="articles-grid">
+              {relatedPosts.map((rel) => (
+                <ArticleCard entry={rel} />
+              ))}
+            </div>
+          </section>
+        )
+      }
+    </div>
+  </article>
+
+  <script is:inline>
+    (function () {
+      // 1. Active TOC section tracking via IntersectionObserver
+      var headings = Array.from(document.querySelectorAll('.article-prose h2[id], .article-prose h3[id]'));
+      var tocLinks = Array.from(document.querySelectorAll('[data-toc-link]'));
+      var mobileToc = document.querySelector('[data-mobile-toc]');
+
+      function setActiveSlug(slug) {
+        tocLinks.forEach(function (link) {
+          var isMatch = link.getAttribute('data-toc-link') === slug;
+          if (isMatch) {
+            link.setAttribute('data-active', 'true');
+          } else {
+            link.removeAttribute('data-active');
+          }
+        });
+      }
+
+      if (headings.length > 0 && tocLinks.length > 0) {
+        setActiveSlug(headings[0].id);
+
+        if ('IntersectionObserver' in window) {
+          var observer = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (entry) {
+                if (entry.isIntersecting && entry.target.id) {
+                  setActiveSlug(entry.target.id);
+                }
+              });
+            },
+            { rootMargin: '-90px 0px -65% 0px', threshold: 0 }
+          );
+          headings.forEach(function (h) {
+            observer.observe(h);
+          });
+        }
+      }
+
+      // Close mobile TOC after clicking a section anchor
+      tocLinks.forEach(function (link) {
+        link.addEventListener('click', function () {
+          if (mobileToc && mobileToc.hasAttribute('open')) {
+            mobileToc.removeAttribute('open');
+          }
+        });
+      });
+
+      // 2. Reading progress bar based on article body
+      var progressFill = document.querySelector('[data-reading-progress]');
+      var articleBody = document.querySelector('[data-article-body]');
+      if (progressFill && articleBody) {
+        window.addEventListener(
+          'scroll',
+          function () {
+            var rect = articleBody.getBoundingClientRect();
+            var total = Math.max(1, rect.height - window.innerHeight * 0.5);
+            var scrolled = Math.min(Math.max(0, -rect.top), total);
+            var pct = Math.round((scrolled / total) * 100);
+            progressFill.style.width = pct + '%';
+          },
+          { passive: true }
+        );
+      }
+
+      // 3. Copy canonical URL button
+      var copyBtn = document.querySelector('[data-copy-canonical]');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+          var url = copyBtn.getAttribute('data-copy-canonical');
+          var copiedText = copyBtn.getAttribute('data-copied-text') || 'Copied';
+          var labelSpan = copyBtn.querySelector('[data-copy-label]');
+          var originalText = labelSpan ? labelSpan.textContent : '';
+          if (navigator.clipboard && url) {
+            navigator.clipboard.writeText(url).then(function () {
+              if (labelSpan) labelSpan.textContent = copiedText;
+              setTimeout(function () {
+                if (labelSpan) labelSpan.textContent = originalText;
+              }, 2000);
+            });
+          }
+        });
+      }
+
+      // 4. Copy code block buttons
+      document.querySelectorAll('[data-copy-code]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var wrapper = btn.closest('[data-code-block]');
+          var codeEl = wrapper ? wrapper.querySelector('code') : null;
+          if (!codeEl || !navigator.clipboard) return;
+          navigator.clipboard.writeText(codeEl.textContent || '').then(function () {
+            var prev = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(function () {
+              btn.textContent = prev;
+            }, 1800);
+          });
+        });
+      });
+    })();
+  </script>
+</BaseLayout>

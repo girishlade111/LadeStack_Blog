@@ -1,0 +1,128 @@
+---
+import type { Locale } from '../../data/locales';
+import { AUTHOR_REGISTRY, SITE_CONFIG } from '../../data/site';
+import { getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getAboutUrl,
+  getEditorialPolicyUrl,
+  getPrivacyUrl,
+} from '../../i18n/urls';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildStaticPageAlternates } from '../../lib/seo';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+interface Props {
+  locale: Locale;
+  pageType: 'about' | 'editorial-policy' | 'privacy';
+}
+
+const { locale, pageType } = Astro.props;
+const dict = getDictionary(locale);
+
+const urlBuilder =
+  pageType === 'about'
+    ? getAboutUrl
+    : pageType === 'editorial-policy'
+    ? getEditorialPolicyUrl
+    : getPrivacyUrl;
+
+const title =
+  pageType === 'about'
+    ? dict.navAbout
+    : pageType === 'editorial-policy'
+    ? dict.footerEditorialPolicy
+    : dict.footerPrivacy;
+
+const canonicalPath = urlBuilder(locale);
+const alternates = buildStaticPageAlternates((loc) => urlBuilder(loc));
+const localeOptions = buildLocaleSwitchOptions(locale, {
+  staticRoute: pageType,
+});
+const authors = Object.values(AUTHOR_REGISTRY);
+---
+
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={dict.footerMission}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{title}</span>
+      </nav>
+      <h1 class="masthead-title">{title}</h1>
+      <p class="masthead-subtitle">{dict.footerMission}</p>
+    </div>
+  </section>
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container" style="max-width:var(--reading-width);">
+      {
+        pageType === 'about' && (
+          <div class="article-prose">
+            <h2>Publication Architecture &amp; Mission</h2>
+            <p>{dict.mastheadSubtitle}</p>
+            <p>
+              Every article on <strong>{SITE_CONFIG.name}</strong> is maintained as a version-controlled Markdown file inside a single GitHub repository and compiled to static HTML with Astro. We operate 19 permanent category desks across nine languages (<code>en</code>, <code>ja</code>, <code>ko</code>, <code>zh</code>, <code>ru</code>, <code>tr</code>, <code>fr</code>, <code>pt</code>, <code>es</code>).
+            </p>
+            <h2>Editorial Masthead</h2>
+            {authors.map((a) => (
+              <div class="article-supplementary-box" style="margin-top:16px;">
+                <h3 style="margin:0 0 6px; font-family:var(--font-display);">
+                  {a.name}
+                </h3>
+                <p style="margin:0 0 8px; font-size:0.875rem; color:var(--accent); font-weight:600;">
+                  {a.role[locale] || a.role.en}
+                </p>
+                <p style="margin:0; font-size:0.9375rem; color:var(--text-muted);">
+                  {a.bio[locale] || a.bio.en}
+                </p>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        pageType === 'editorial-policy' && (
+          <div class="article-prose">
+            <h2>Primary Sourcing &amp; Fact Verification</h2>
+            <p>
+              All technical, scientific, and financial claims require primary source citations recorded in the article’s structured <code>sources</code> frontmatter. Unverified rumors or synthetic filler are strictly prohibited.
+            </p>
+            <h2>Multilingual Translation Integrity</h2>
+            <p>
+              Articles are grouped across languages by an immutable <code>translationKey</code>. Only human-reviewed translations with <code>status: published</code> are built into public pages and reciprocal <code>hreflang</code> graphs. Missing translations degrade honestly without machine-generated stubs.
+            </p>
+            <h2>Corrections &amp; Update Timestamps</h2>
+            <p>
+              Substantial revisions update the explicit <code>updatedAt</code> timestamp and remain auditable in the repository commit log. Contact the editorial desk at <a href={`mailto:${SITE_CONFIG.contactEmail}`}>{SITE_CONFIG.contactEmail}</a>.
+            </p>
+          </div>
+        )
+      }
+
+      {
+        pageType === 'privacy' && (
+          <div class="article-prose">
+            <h2>Zero-Account Static Reading</h2>
+            <p>
+              <strong>{SITE_CONFIG.name}</strong> is a static publication. Reading articles, switching languages, and searching via our static Pagefind index happen directly in your browser without requiring user accounts, cookies, or personal profiles.
+            </p>
+            <h2>Local Preferences Only</h2>
+            <p>
+              When you explicitly choose Light or Dark appearance, your preference is stored locally in your browser’s <code>localStorage</code> under the key <code>ladestack-theme</code> and is never transmitted to any server.
+            </p>
+          </div>
+        )
+      }
+    </div>
+  </section>
+</BaseLayout>

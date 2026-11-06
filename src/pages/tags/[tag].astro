@@ -1,0 +1,16 @@
+---
+import { getAllPublishedTags } from '../../lib/posts';
+import TagArchiveView from '../../components/views/TagArchiveView.astro';
+
+export function getStaticPaths() {
+  const tags = getAllPublishedTags('en');
+  return tags.map(({ tag }) => ({
+    params: { tag },
+    props: { tag },
+  }));
+}
+
+const { tag } = Astro.props;
+---
+
+<TagArchiveView locale="en" tag={tag} />

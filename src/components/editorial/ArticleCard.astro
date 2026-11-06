@@ -1,0 +1,68 @@
+---
+import type { BlogEntry } from '../../lib/validators';
+import { getCategoryMeta } from '../../data/categories';
+import { formatDate, getDictionary } from '../../i18n';
+import { getPostUrl, getCategoryUrl } from '../../i18n/urls';
+import { AUTHOR_REGISTRY } from '../../data/site';
+
+interface Props {
+  entry: BlogEntry;
+}
+
+const { entry } = Astro.props;
+const locale = entry.data.lang;
+const dict = getDictionary(locale);
+const postUrl = getPostUrl(locale, entry.data.slug);
+const categoryUrl = getCategoryUrl(locale, entry.data.category);
+const categoryMeta = getCategoryMeta(entry.data.category, locale);
+const author = AUTHOR_REGISTRY[entry.data.authorId];
+---
+
+<article class="article-card">
+  <a href={postUrl} class="article-card-cover" tabindex="-1" aria-hidden="true">
+    {
+      entry.data.coverImage ? (
+        <img
+          src={entry.data.coverImage}
+          alt={entry.data.coverAlt || entry.data.title}
+          loading="lazy"
+          width="640"
+          height="360"
+        />
+      ) : (
+        <div class="article-card-fallback">
+          <span style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent);">
+            {categoryMeta.label}
+          </span>
+          <strong style="font-family:var(--font-display); font-size:1.1rem; color:var(--text);">
+            {entry.data.title}
+          </strong>
+        </div>
+      )
+    }
+  </a>
+
+  <div class="article-card-body">
+    <div class="metadata-line">
+      <a href={categoryUrl} class="metadata-category-link">{categoryMeta.label}</a>
+      <span class="metadata-sep" aria-hidden="true">·</span>
+      <time datetime={entry.data.publishedAt.toISOString()}>
+        {formatDate(entry.data.publishedAt, locale)}
+      </time>
+      <span class="metadata-sep" aria-hidden="true">·</span>
+      <span>{entry.readingTimeMinutes} {dict.readingTimeMinutes}</span>
+    </div>
+
+    <h3 class="article-card-title">
+      <a href={postUrl}>{entry.data.title}</a>
+    </h3>
+
+    <p class="article-card-excerpt">
+      {entry.data.description}
+    </p>
+
+    <div class="metadata-line" style="margin-bottom:0; margin-top:auto;">
+      <span>{dict.byAuthor} {author?.name ?? entry.data.authorId}</span>
+    </div>
+  </div>
+</article>

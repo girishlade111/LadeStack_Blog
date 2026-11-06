@@ -1,0 +1,19 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../data/locales';
+import SearchPageView from '../../components/views/SearchPageView.astro';
+
+export function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<SearchPageView locale={locale} />

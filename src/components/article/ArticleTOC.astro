@@ -1,0 +1,59 @@
+---
+import type { TocHeading } from '../../lib/validators';
+import type { Locale } from '../../data/locales';
+import { getDictionary } from '../../i18n';
+
+interface Props {
+  headings: TocHeading[];
+  locale: Locale;
+  mode: 'mobile' | 'desktop';
+}
+
+const { headings, locale, mode } = Astro.props;
+const dict = getDictionary(locale);
+const hasHeadings = headings.length >= 2;
+---
+
+{
+  mode === 'mobile' && hasHeadings && (
+    <details class="mobile-toc-disclosure" data-mobile-toc>
+      <summary class="mobile-toc-summary">{dict.onThisPage}</summary>
+      <nav aria-label={dict.onThisPage} style="margin-top:12px;">
+        <ol class="toc-list">
+          {headings.map((h) => (
+            <li class={h.depth === 3 ? 'toc-item-depth-3' : 'toc-item-depth-2'}>
+              <a href={`#${h.slug}`} class="toc-link" data-toc-link={h.slug}>
+                {h.text}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </details>
+  )
+}
+
+{
+  mode === 'desktop' && (
+    <aside class="desktop-toc-aside" aria-label={dict.onThisPage}>
+      <h2 class="toc-heading-title">{dict.onThisPage}</h2>
+      {hasHeadings ? (
+        <nav aria-label={dict.onThisPage}>
+          <ol class="toc-list">
+            {headings.map((h) => (
+              <li class={h.depth === 3 ? 'toc-item-depth-3' : 'toc-item-depth-2'}>
+                <a href={`#${h.slug}`} class="toc-link" data-toc-link={h.slug}>
+                  {h.text}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : (
+        <p style="margin:0; font-size:0.8125rem; color:var(--text-muted);">
+          {dict.noHeadingsNote}
+        </p>
+      )}
+    </aside>
+  )
+}

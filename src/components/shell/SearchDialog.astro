@@ -1,0 +1,80 @@
+---
+import type { Locale } from '../../data/locales';
+import { CATEGORY_IDS, getCategoryMeta } from '../../data/categories';
+import { getDictionary } from '../../i18n';
+import { getSearchUrl } from '../../i18n/urls';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const dict = getDictionary(locale);
+---
+
+<dialog
+  id="site-search-dialog"
+  class="search-dialog"
+  aria-labelledby="search-dialog-title"
+  data-search-locale={locale}
+  data-no-results={dict.searchNoResults}
+  data-idle-prompt={dict.searchIdlePrompt}
+  data-matches-label={dict.searchMatchesCount}
+>
+  <div class="search-dialog-header">
+    <h2 id="search-dialog-title" style="margin:0; font-size:1.05rem; font-family:var(--font-display);">
+      {dict.searchDialogTitle}
+    </h2>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <a href={getSearchUrl(locale)} style="font-size:0.8125rem; color:var(--accent);">
+        /{locale === 'en' ? 'search' : `${locale}/search`}/
+      </a>
+      <button
+        type="button"
+        class="theme-cycle-btn"
+        data-close-search
+        aria-label={dict.searchCloseLabel}
+      >
+        {dict.searchCloseLabel} (Esc)
+      </button>
+    </div>
+  </div>
+
+  <div class="search-dialog-body">
+    <div class="search-controls-row">
+      <div>
+        <label for="dialog-search-input" class="skip-link">{dict.searchPlaceholder}</label>
+        <input
+          id="dialog-search-input"
+          type="search"
+          class="search-input"
+          placeholder={dict.searchPlaceholder}
+          autocomplete="off"
+          data-search-input
+        />
+      </div>
+      <div>
+        <label for="dialog-search-category" class="skip-link">{dict.navCategories}</label>
+        <select id="dialog-search-category" class="search-category-select" data-search-category>
+          <option value="">{dict.searchAllCategories}</option>
+          {
+            CATEGORY_IDS.map((catId) => (
+              <option value={catId}>{getCategoryMeta(catId, locale).label}</option>
+            ))
+          }
+        </select>
+      </div>
+    </div>
+
+    <div
+      id="dialog-search-status"
+      aria-live="polite"
+      style="font-size:0.8125rem; color:var(--text-muted); margin-bottom:10px;"
+      data-search-status
+    >
+      {dict.searchIdlePrompt}
+    </div>
+
+    <div id="dialog-search-results" data-search-results></div>
+  </div>
+</dialog>

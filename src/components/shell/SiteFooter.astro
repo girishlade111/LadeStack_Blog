@@ -1,0 +1,89 @@
+---
+import type { Locale } from '../../data/locales';
+import { getCategoryMeta } from '../../data/categories';
+import { getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getArticlesUrl,
+  getCategoryUrl,
+  getSearchUrl,
+  getAboutUrl,
+  getEditorialPolicyUrl,
+  getPrivacyUrl,
+} from '../../i18n/urls';
+import { SITE_CONFIG } from '../../data/site';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const dict = getDictionary(locale);
+const highlightCategories = [
+  'technology',
+  'science',
+  'business-finance',
+  'climate',
+  'health',
+  'travel-transportation',
+] as const;
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href={getHomeUrl(locale)} class="brand-link" style="margin-bottom:12px;">
+          <span>LadeStack Blog</span>
+        </a>
+        <p style="margin:8px 0 16px; max-width:48ch; line-height:1.6;">
+          {dict.footerMission}
+        </p>
+        <p style="margin:0; font-size:0.8125rem;">
+          <a href={SITE_CONFIG.parentUrl} rel="noopener" style="color:var(--accent); font-weight:600;">
+            {dict.footerParentLink} ↗
+          </a>
+        </p>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 12px; font-size:0.875rem; color:var(--text);">
+          {dict.navCategories}
+        </h3>
+        <ul class="footer-links-list">
+          {
+            highlightCategories.map((catId) => (
+              <li>
+                <a href={getCategoryUrl(locale, catId)}>
+                  {getCategoryMeta(catId, locale).label}
+                </a>
+              </li>
+            ))
+          }
+          <li>
+            <a href={getArticlesUrl(locale)}>{dict.viewAllArticles}</a>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 12px; font-size:0.875rem; color:var(--text);">
+          {dict.footerEditorialLinks}
+        </h3>
+        <ul class="footer-links-list">
+          <li><a href={getAboutUrl(locale)}>{dict.navAbout}</a></li>
+          <li><a href={getEditorialPolicyUrl(locale)}>{dict.footerEditorialPolicy}</a></li>
+          <li><a href={getPrivacyUrl(locale)}>{dict.footerPrivacy}</a></li>
+          <li><a href={getSearchUrl(locale)}>{dict.navSearch}</a></li>
+          <li><a href="/rss.xml">{dict.footerRss}</a></li>
+          <li><a href="/sitemap.xml">XML Sitemap</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="padding-top:20px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; font-size:0.8125rem;">
+      <span>{dict.footerCopyright}</span>
+      <span>Canonical Origin: {SITE_CONFIG.origin}</span>
+    </div>
+  </div>
+</footer>

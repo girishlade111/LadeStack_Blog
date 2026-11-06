@@ -1,0 +1,28 @@
+---
+import { NON_DEFAULT_LOCALES } from '../../../data/locales';
+import { getPublishedPosts } from '../../../lib/posts';
+import type { BlogEntry } from '../../../lib/validators';
+import ArticleDetailView from '../../../components/views/ArticleDetailView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { locale: string; slug: string };
+    props: { entry: BlogEntry };
+  }[] = [];
+
+  for (const locale of NON_DEFAULT_LOCALES) {
+    const posts = getPublishedPosts(locale, true);
+    for (const entry of posts) {
+      paths.push({
+        params: { locale, slug: entry.data.slug },
+        props: { entry },
+      });
+    }
+  }
+  return paths;
+}
+
+const { entry } = Astro.props;
+---
+
+<ArticleDetailView entry={entry} />

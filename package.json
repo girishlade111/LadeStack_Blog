@@ -1,0 +1,28 @@
+{
+  "name": "ladestack-blog",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight, original, multilingual static editorial publication built with Astro",
+  "scripts": {
+    "dev": "node --import tsx scripts/build-search-index.ts && astro dev --host 0.0.0.0 --port 3000",
+    "build:site": "astro build",
+    "build:search": "node --import tsx scripts/build-search-index.ts --out dist/pagefind",
+    "build": "npm run validate:content && npm run build:site && npm run build:search",
+    "preview": "astro preview --host 0.0.0.0 --port 3000",
+    "validate:content": "node --import tsx scripts/validate-content.ts",
+    "verify:seo": "node --import tsx scripts/verify-seo.ts",
+    "lint": "node --import tsx scripts/validate-content.ts && tsc --noEmit",
+    "test": "npx --yes tsx --test src/lib/blog.test.ts"
+  },
+  "dependencies": {
+    "astro": "^5.3.0",
+    "marked": "^15.0.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

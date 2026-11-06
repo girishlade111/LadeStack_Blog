@@ -1,0 +1,31 @@
+---
+import { buildLocaleSwitchOptions } from '../lib/translations';
+import { getHomeUrl, getArticlesUrl, getSearchUrl } from '../i18n/urls';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const localeOptions = buildLocaleSwitchOptions('en', { staticRoute: 'home' });
+---
+
+<BaseLayout
+  locale="en"
+  title="404 — Page Not Found"
+  description="The requested article or route does not exist in this language."
+  canonicalPath="/404/"
+  localeOptions={localeOptions}
+  noindex={true}
+>
+  <section class="editorial-section" style="border-bottom:none; padding:72px 0;">
+    <div class="container" style="max-width:640px;">
+      <p class="masthead-kicker">HTTP 404</p>
+      <h1 class="masthead-title">Page or translation not found</h1>
+      <p class="masthead-subtitle" style="margin-bottom:24px;">
+        We do not generate unreviewed placeholder translations. Use universal search or return to the main editorial desk.
+      </p>
+      <div style="display:flex; flex-wrap:wrap; gap:12px;">
+        <a href={getHomeUrl('en')} class="theme-cycle-btn">Return to Homepage</a>
+        <a href={getArticlesUrl('en')} class="theme-cycle-btn">Browse All Articles</a>
+        <a href={getSearchUrl('en')} class="theme-cycle-btn">Search Articles</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,31 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../../data/locales';
+import { getAllPublishedTags } from '../../../lib/posts';
+import TagArchiveView from '../../../components/views/TagArchiveView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { locale: string; tag: string };
+    props: { locale: Locale; tag: string };
+  }[] = [];
+
+  for (const locale of NON_DEFAULT_LOCALES) {
+    for (const { tag } of getAllPublishedTags(locale)) {
+      paths.push({
+        params: { locale, tag },
+        props: { locale, tag },
+      });
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  locale: Locale;
+  tag: string;
+}
+
+const { locale, tag } = Astro.props;
+---
+
+<TagArchiveView locale={locale} tag={tag} />

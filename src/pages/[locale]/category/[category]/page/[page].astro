@@ -1,0 +1,38 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../../../../data/locales';
+import { CATEGORY_IDS, type CategoryId } from '../../../../../data/categories';
+import { SITE_CONFIG } from '../../../../../data/site';
+import { getCategoryPosts } from '../../../../../lib/posts';
+import CategoryArchiveView from '../../../../../components/views/CategoryArchiveView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { locale: string; category: string; page: string };
+    props: { locale: Locale; categoryId: CategoryId; page: number };
+  }[] = [];
+
+  for (const locale of NON_DEFAULT_LOCALES) {
+    for (const categoryId of CATEGORY_IDS) {
+      const total = getCategoryPosts(categoryId, locale).length;
+      const totalPages = Math.ceil(total / SITE_CONFIG.postsPerPage);
+      for (let page = 2; page <= Math.max(2, totalPages); page++) {
+        paths.push({
+          params: { locale, category: categoryId, page: String(page) },
+          props: { locale, categoryId, page },
+        });
+      }
+    }
+  }
+  return paths;
+}
+
+interface Props {
+  locale: Locale;
+  categoryId: CategoryId;
+  page: number;
+}
+
+const { locale, categoryId, page } = Astro.props;
+---
+
+<CategoryArchiveView locale={locale} categoryId={categoryId} page={page} />

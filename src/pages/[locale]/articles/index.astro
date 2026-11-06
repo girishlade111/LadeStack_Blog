@@ -1,0 +1,19 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../../data/locales';
+import ArticlesArchiveView from '../../../components/views/ArticlesArchiveView.astro';
+
+export function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<ArticlesArchiveView locale={locale} page={1} />

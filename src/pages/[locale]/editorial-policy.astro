@@ -1,0 +1,19 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../data/locales';
+import StaticPolicyView from '../../components/views/StaticPolicyView.astro';
+
+export function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((locale) => ({
+    params: { locale },
+    props: { locale },
+  }));
+}
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<StaticPolicyView locale={locale} pageType="editorial-policy" />

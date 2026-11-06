@@ -1,0 +1,19 @@
+---
+import { CATEGORY_IDS, type CategoryId } from '../../../data/categories';
+import CategoryArchiveView from '../../../components/views/CategoryArchiveView.astro';
+
+export function getStaticPaths() {
+  return CATEGORY_IDS.map((category) => ({
+    params: { category },
+    props: { categoryId: category },
+  }));
+}
+
+interface Props {
+  categoryId: CategoryId;
+}
+
+const { categoryId } = Astro.props;
+---
+
+<CategoryArchiveView locale="en" categoryId={categoryId} page={1} />

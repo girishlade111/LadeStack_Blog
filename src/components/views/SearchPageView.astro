@@ -1,0 +1,181 @@
+---
+import type { Locale } from '../../data/locales';
+import { CATEGORY_IDS, getCategoryMeta } from '../../data/categories';
+import { getDictionary } from '../../i18n';
+import { getHomeUrl, getSearchUrl } from '../../i18n/urls';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildStaticPageAlternates } from '../../lib/seo';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const dict = getDictionary(locale);
+const canonicalPath = getSearchUrl(locale);
+const alternates = buildStaticPageAlternates((loc) => getSearchUrl(loc));
+const localeOptions = buildLocaleSwitchOptions(locale, {
+  staticRoute: 'search',
+});
+---
+
+<BaseLayout
+  locale={locale}
+  title={dict.searchDialogTitle}
+  description={dict.searchIdlePrompt}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{dict.navSearch}</span>
+      </nav>
+      <h1 class="masthead-title">{dict.searchDialogTitle}</h1>
+      <p class="masthead-subtitle">{dict.searchIdlePrompt}</p>
+    </div>
+  </section>
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container" style="max-width:860px; margin:0 auto;">
+      <div
+        id="page-search-container"
+        data-page-search-locale={locale}
+        data-no-results={dict.searchNoResults}
+        data-matches-label={dict.searchMatchesCount}
+      >
+        <div class="search-controls-row">
+          <div>
+            <label for="page-search-input" class="skip-link">{dict.searchPlaceholder}</label>
+            <input
+              id="page-search-input"
+              type="search"
+              class="search-input"
+              placeholder={dict.searchPlaceholder}
+              autocomplete="off"
+              data-page-search-input
+            />
+          </div>
+          <div>
+            <label for="page-search-category" class="skip-link">{dict.navCategories}</label>
+            <select
+              id="page-search-category"
+              class="search-category-select"
+              data-page-search-category
+            >
+              <option value="">{dict.searchAllCategories}</option>
+              {
+                CATEGORY_IDS.map((catId) => (
+                  <option value={catId}>
+                    {getCategoryMeta(catId, locale).label}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+        </div>
+
+        <div
+          aria-live="polite"
+          style="font-size:0.875rem; color:var(--text-muted); margin-bottom:16px;"
+          data-page-search-status
+        >
+          {dict.searchIdlePrompt}
+        </div>
+
+        <div data-page-search-results></div>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    (function () {
+      var container = document.getElementById('page-search-container');
+      if (!container) return;
+      var input = container.querySelector('[data-page-search-input]');
+      var select = container.querySelector('[data-page-search-category]');
+      var statusEl = container.querySelector('[data-page-search-status]');
+      var resultsEl = container.querySelector('[data-page-search-results]');
+      var lang = container.getAttribute('data-page-search-locale') || 'en';
+      var noResultsText = container.getAttribute('data-no-results') || 'No matches.';
+      var matchesLabel = container.getAttribute('data-matches-label') || 'matches';
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      async function runPageSearch() {
+        var q = input ? input.value.trim() : '';
+        var cat = select ? select.value : '';
+        var runtime = await import('/pagefind/pagefind.js');
+        var items = await runtime.searchLocale(q, { lang: lang, category: cat });
+        if (statusEl) statusEl.textContent = items.length + ' ' + matchesLabel;
+        if (!resultsEl) return;
+
+        if (items.length === 0) {
+          resultsEl.innerHTML =
+            '<div class="empty-state-box"><p style="margin:0;">' +
+            escapeHtml(noResultsText) +
+            '</p></div>';
+          return;
+        }
+
+        resultsEl.innerHTML = items
+          .map(function (item) {
+            var subHtml = '';
+            if (item.matchedSections && item.matchedSections.length > 0) {
+              subHtml =
+                '<div class="search-subresults">' +
+                item.matchedSections
+                  .map(function (sec) {
+                    return (
+                      '<a class="search-subresult-link" href="' +
+                      escapeHtml(sec.url) +
+                      '">§ ' +
+                      escapeHtml(sec.title) +
+                      '</a>'
+                    );
+                  })
+                  .join('') +
+                '</div>';
+            }
+            return (
+              '<div class="search-result-item">' +
+              '<div class="metadata-line" style="margin-bottom:4px;">' +
+              '<span class="metadata-category-link">' +
+              escapeHtml(item.categoryLabel) +
+              '</span>' +
+              '<span class="metadata-sep">·</span>' +
+              '<span>' +
+              escapeHtml(item.publishedDateFormatted) +
+              '</span>' +
+              '</div>' +
+              '<h2 class="search-result-title"><a href="' +
+              escapeHtml(item.url) +
+              '">' +
+              escapeHtml(item.title) +
+              '</a></h2>' +
+              '<p style="margin:0; font-size:0.9375rem; color:var(--text-muted);">' +
+              escapeHtml(item.description) +
+              '</p>' +
+              subHtml +
+              '</div>'
+            );
+          })
+          .join('');
+      }
+
+      if (input) input.addEventListener('input', runPageSearch);
+      if (select) select.addEventListener('change', runPageSearch);
+      runPageSearch();
+    })();
+  </script>
+</BaseLayout>

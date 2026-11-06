@@ -1,0 +1,135 @@
+---
+import { LOCALE_REGISTRY, type Locale } from '../../data/locales';
+import { CATEGORY_IDS, getCategoryMeta } from '../../data/categories';
+import { getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getArticlesUrl,
+  getCategoryUrl,
+  getAboutUrl,
+} from '../../i18n/urls';
+import type { LocaleSwitchOption } from '../../lib/translations';
+
+interface Props {
+  locale: Locale;
+  localeOptions: LocaleSwitchOption[];
+  currentPath?: string;
+}
+
+const { locale, localeOptions, currentPath = '' } = Astro.props;
+const dict = getDictionary(locale);
+const localeInfo = LOCALE_REGISTRY[locale];
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href={getHomeUrl(locale)} class="brand-link" aria-label="LadeStack Blog">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M5 4h4v12h10v4H5V4z" fill="var(--bg)" />
+          <rect x="13" y="4" width="6" height="6" rx="1" fill="var(--accent)" />
+        </svg>
+      </span>
+      <span>LadeStack Blog</span>
+    </a>
+
+    <nav class="header-nav" aria-label="Primary">
+      <a
+        href={getArticlesUrl(locale)}
+        class="nav-link"
+        aria-current={currentPath.includes('/articles/') ? 'page' : undefined}
+      >
+        {dict.navArticles}
+      </a>
+
+      <details class="dropdown-details" data-nav-dropdown>
+        <summary class="dropdown-summary" aria-label={dict.navCategories}>
+          <span>{dict.navCategories}</span>
+          <span aria-hidden="true">▾</span>
+        </summary>
+        <div class="dropdown-panel categories-dropdown-panel" role="region" aria-label={dict.navCategories}>
+          <div class="categories-grid-menu">
+            {
+              CATEGORY_IDS.map((catId) => {
+                const meta = getCategoryMeta(catId, locale);
+                return (
+                  <a href={getCategoryUrl(locale, catId)} class="category-menu-item">
+                    <span>{meta.label}</span>
+                  </a>
+                );
+              })
+            }
+          </div>
+        </div>
+      </details>
+
+      <a
+        href={getAboutUrl(locale)}
+        class="nav-link"
+        aria-current={currentPath.includes('/about/') ? 'page' : undefined}
+      >
+        {dict.navAbout}
+      </a>
+    </nav>
+
+    <div class="header-actions">
+      <button
+        type="button"
+        class="search-trigger-btn"
+        data-open-search
+        aria-label={`${dict.navSearch} (${dict.searchShortcutHint})`}
+      >
+        <span>{dict.navSearch}</span>
+        <kbd class="shortcut-kbd" aria-hidden="true">{dict.searchShortcutHint}</kbd>
+      </button>
+
+      <details class="dropdown-details" data-nav-dropdown>
+        <summary
+          class="dropdown-summary"
+          aria-label={`${dict.localeSwitcherLabel}: ${localeInfo.nativeName}`}
+        >
+          <span>{localeInfo.nativeName}</span>
+          <span class="locale-code-tag">{locale.toUpperCase()}</span>
+        </summary>
+        <div class="dropdown-panel locale-dropdown-panel" role="region" aria-label={dict.localeSwitcherLabel}>
+          <ul class="locale-menu-list">
+            {
+              localeOptions.map((opt) => {
+                const info = LOCALE_REGISTRY[opt.locale];
+                return (
+                  <li>
+                    <a
+                      href={opt.href}
+                      class="locale-menu-link"
+                      hreflang={opt.locale}
+                      lang={opt.locale}
+                      aria-current={opt.isCurrent ? 'true' : undefined}
+                    >
+                      <span>{info.nativeName}</span>
+                      <span class="locale-code-tag">
+                        {opt.locale.toUpperCase()}
+                        {!opt.isAvailableArticleVariant ? ' · Home' : ''}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </div>
+      </details>
+
+      <button
+        type="button"
+        class="theme-cycle-btn"
+        data-theme-toggle
+        data-label-light={dict.themeLight}
+        data-label-dark={dict.themeDark}
+        data-label-system={dict.themeSystem}
+        aria-label={`${dict.themeLabel}: ${dict.themeSystem}`}
+      >
+        <span data-theme-text>{dict.themeSystem}</span>
+      </button>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,140 @@
+---
+import type { Locale } from '../../data/locales';
+import { CATEGORY_IDS, getCategoryMeta, type CategoryId } from '../../data/categories';
+import { SITE_CONFIG } from '../../data/site';
+import { getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getCategoryUrl,
+} from '../../i18n/urls';
+import { getCategoryPosts } from '../../lib/posts';
+import { paginateItems } from '../../lib/pagination';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildStaticPageAlternates, buildBreadcrumbJsonLd } from '../../lib/seo';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../editorial/ArticleCard.astro';
+
+interface Props {
+  locale: Locale;
+  categoryId: CategoryId;
+  page?: number;
+}
+
+const { locale, categoryId, page = 1 } = Astro.props;
+const dict = getDictionary(locale);
+const categoryMeta = getCategoryMeta(categoryId, locale);
+const allCategoryPosts = getCategoryPosts(categoryId, locale);
+const pagination = paginateItems(allCategoryPosts, page, SITE_CONFIG.postsPerPage);
+
+const canonicalPath = getCategoryUrl(locale, categoryId, pagination.currentPage);
+const alternates = buildStaticPageAlternates((loc) =>
+  getCategoryUrl(loc, categoryId, 1)
+);
+const localeOptions = buildLocaleSwitchOptions(locale, {
+  categorySlug: categoryId,
+});
+
+const crumbs = [
+  { label: dict.breadcrumbHome, href: getHomeUrl(locale) },
+  { label: categoryMeta.label, href: canonicalPath },
+];
+
+// Active categories in this locale for empty-state discovery
+const activeCategories = CATEGORY_IDS.filter(
+  (id) => getCategoryPosts(id, locale).length > 0
+);
+---
+
+<BaseLayout
+  locale={locale}
+  title={`${categoryMeta.label}${pagination.currentPage > 1 ? ` (${dict.paginationPageOf} ${pagination.currentPage})` : ''}`}
+  description={categoryMeta.description}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+  noindex={allCategoryPosts.length === 0}
+  jsonLd={[buildBreadcrumbJsonLd(crumbs)]}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{categoryMeta.label}</span>
+      </nav>
+      <p class="masthead-kicker">
+        /{locale === 'en' ? `category/${categoryId}` : `${locale}/category/${categoryId}`}/ · {allCategoryPosts.length}
+      </p>
+      <h1 class="masthead-title">{categoryMeta.label}</h1>
+      <p class="masthead-subtitle">{categoryMeta.description}</p>
+    </div>
+  </section>
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container">
+      {
+        pagination.items.length > 0 ? (
+          <>
+            <div class="articles-grid">
+              {pagination.items.map((entry) => (
+                <ArticleCard entry={entry} />
+              ))}
+            </div>
+
+            {pagination.totalPages > 1 && (
+              <nav class="pagination-nav" aria-label="Pagination">
+                {pagination.hasPrev ? (
+                  <a
+                    href={getCategoryUrl(locale, categoryId, pagination.currentPage - 1)}
+                    class="theme-cycle-btn"
+                  >
+                    ← {dict.paginationPrev}
+                  </a>
+                ) : (
+                  <span />
+                )}
+                <span>
+                  {dict.paginationPageOf} {pagination.currentPage} / {pagination.totalPages}
+                </span>
+                {pagination.hasNext ? (
+                  <a
+                    href={getCategoryUrl(locale, categoryId, pagination.currentPage + 1)}
+                    class="theme-cycle-btn"
+                  >
+                    {dict.paginationNext} →
+                  </a>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            )}
+          </>
+        ) : (
+          <div class="empty-state-box">
+            <h2 style="margin:0 0 8px; font-family:var(--font-display); font-size:1.35rem;">
+              {dict.emptyCategoryTitle}
+            </h2>
+            <p style="margin:0 0 20px; color:var(--text-muted); max-width:62ch;">
+              {dict.emptyCategoryBody}
+            </p>
+            <h3 style="margin:0 0 12px; font-size:0.875rem;">
+              {dict.exploreOtherCategories}
+            </h3>
+            <div class="category-directory-grid">
+              {activeCategories.map((id) => {
+                const meta = getCategoryMeta(id, locale);
+                const count = getCategoryPosts(id, locale).length;
+                return (
+                  <a href={getCategoryUrl(locale, id)} class="category-directory-item">
+                    <span>{meta.label}</span>
+                    <span class="category-count">{count}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )
+      }
+    </div>
+  </section>
+</BaseLayout>

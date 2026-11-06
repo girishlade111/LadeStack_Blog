@@ -1,0 +1,16 @@
+---
+import { getPublishedPosts } from '../../lib/posts';
+import ArticleDetailView from '../../components/views/ArticleDetailView.astro';
+
+export function getStaticPaths() {
+  const posts = getPublishedPosts('en', true);
+  return posts.map((entry) => ({
+    params: { slug: entry.data.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+---
+
+<ArticleDetailView entry={entry} />

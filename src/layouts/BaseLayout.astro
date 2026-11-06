@@ -1,0 +1,328 @@
+---
+import '../styles/global.css';
+import { LOCALE_REGISTRY, type Locale } from '../data/locales';
+import { SITE_CONFIG } from '../data/site';
+import { getDictionary } from '../i18n';
+import { buildCanonicalUrl } from '../i18n/urls';
+import type { HreflangAlternate } from '../lib/seo';
+import type { LocaleSwitchOption } from '../lib/translations';
+import SiteHeader from '../components/shell/SiteHeader.astro';
+import SearchDialog from '../components/shell/SearchDialog.astro';
+import SiteFooter from '../components/shell/SiteFooter.astro';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  canonicalPath: string;
+  alternates?: HreflangAlternate[];
+  localeOptions: LocaleSwitchOption[];
+  ogType?: 'website' | 'article';
+  ogImage?: string;
+  publishedTime?: string;
+  modifiedTime?: string;
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown>[];
+}
+
+const {
+  locale,
+  title,
+  description,
+  canonicalPath,
+  alternates = [],
+  localeOptions,
+  ogType = 'website',
+  ogImage = SITE_CONFIG.defaultOgImage,
+  publishedTime,
+  modifiedTime,
+  noindex = false,
+  jsonLd = [],
+} = Astro.props;
+
+const dict = getDictionary(locale);
+const htmlLang = LOCALE_REGISTRY[locale].htmlLang;
+const canonicalUrl = buildCanonicalUrl(canonicalPath);
+const absoluteOgImage = buildCanonicalUrl(ogImage);
+const fullTitle = title.includes(SITE_CONFIG.name)
+  ? title
+  : `${title} — ${SITE_CONFIG.name}`;
+---
+
+<!doctype html>
+<html lang={htmlLang} dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title="LadeStack Blog RSS" href="/rss.xml" />
+
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    {
+      alternates.map((alt) => (
+        <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />
+      ))
+    }
+
+    <meta property="og:site_name" content={SITE_CONFIG.name} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={absoluteOgImage} />
+    <meta property="og:locale" content={LOCALE_REGISTRY[locale].dateLocale.replace('-', '_')} />
+
+    {publishedTime && <meta property="article:published_time" content={publishedTime} />}
+    {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={absoluteOgImage} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('ladestack-theme');
+          if (saved === 'light' || saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', saved);
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    {
+      jsonLd.map((schema) => (
+        <script
+          type="application/ld+json"
+          set:html={JSON.stringify(schema)}
+        />
+      ))
+    }
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">{dict.skipToContent}</a>
+
+    <SiteHeader
+      locale={locale}
+      localeOptions={localeOptions}
+      currentPath={canonicalPath}
+    />
+
+    <main id="main-content">
+      <slot />
+    </main>
+
+    <SearchDialog locale={locale} />
+    <SiteFooter locale={locale} />
+
+    <script is:inline>
+      (function () {
+        // 1. Theme Switcher (System -> Light -> Dark)
+        var themeBtn = document.querySelector('[data-theme-toggle]');
+        var themeText = document.querySelector('[data-theme-text]');
+        var modes = ['system', 'light', 'dark'];
+
+        function getStoredTheme() {
+          try {
+            var val = localStorage.getItem('ladestack-theme');
+            return val === 'light' || val === 'dark' ? val : 'system';
+          } catch (e) {
+            return 'system';
+          }
+        }
+
+        function updateThemeUI(mode) {
+          if (!themeBtn || !themeText) return;
+          var label =
+            mode === 'light'
+              ? themeBtn.getAttribute('data-label-light')
+              : mode === 'dark'
+              ? themeBtn.getAttribute('data-label-dark')
+              : themeBtn.getAttribute('data-label-system');
+          themeText.textContent = label || mode;
+          themeBtn.setAttribute('aria-label', 'Appearance: ' + (label || mode));
+          if (mode === 'light' || mode === 'dark') {
+            document.documentElement.setAttribute('data-theme', mode);
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+          }
+        }
+
+        updateThemeUI(getStoredTheme());
+
+        if (themeBtn) {
+          themeBtn.addEventListener('click', function () {
+            var current = getStoredTheme();
+            var next = modes[(modes.indexOf(current) + 1) % modes.length];
+            try {
+              if (next === 'system') {
+                localStorage.removeItem('ladestack-theme');
+              } else {
+                localStorage.setItem('ladestack-theme', next);
+              }
+            } catch (e) {}
+            updateThemeUI(next);
+          });
+        }
+
+        // 2. Close Header Dropdowns on outside click or Escape
+        document.addEventListener('click', function (e) {
+          document.querySelectorAll('details[data-nav-dropdown][open]').forEach(function (el) {
+            if (!el.contains(e.target)) {
+              el.removeAttribute('open');
+            }
+          });
+        });
+
+        // 3. Universal Search Dialog (Lazy-loads /pagefind/pagefind.js on open)
+        var dialog = document.getElementById('site-search-dialog');
+        var openBtns = document.querySelectorAll('[data-open-search]');
+        var closeBtn = document.querySelector('[data-close-search]');
+        var searchInput = document.querySelector('[data-search-input]');
+        var categorySelect = document.querySelector('[data-search-category]');
+        var statusEl = document.querySelector('[data-search-status]');
+        var resultsEl = document.querySelector('[data-search-results]');
+        var pagefindModule = null;
+
+        async function ensureSearchRuntime() {
+          if (!pagefindModule) {
+            pagefindModule = await import('/pagefind/pagefind.js');
+          }
+          return pagefindModule;
+        }
+
+        function escapeHtml(str) {
+          return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        async function executeSearch() {
+          if (!dialog || !searchInput || !resultsEl || !statusEl) return;
+          var q = searchInput.value.trim();
+          var cat = categorySelect ? categorySelect.value : '';
+          var lang = dialog.getAttribute('data-search-locale') || document.documentElement.lang || 'en';
+          var noResultsText = dialog.getAttribute('data-no-results') || 'No matches.';
+          var matchesLabel = dialog.getAttribute('data-matches-label') || 'matches';
+
+          try {
+            var runtime = await ensureSearchRuntime();
+            var items = await runtime.searchLocale(q, { lang: lang, category: cat });
+            statusEl.textContent = items.length + ' ' + matchesLabel;
+
+            if (items.length === 0) {
+              resultsEl.innerHTML =
+                '<div class="empty-state-box"><p style="margin:0;">' +
+                escapeHtml(noResultsText) +
+                '</p></div>';
+              return;
+            }
+
+            resultsEl.innerHTML = items
+              .map(function (item) {
+                var subHtml = '';
+                if (item.matchedSections && item.matchedSections.length > 0) {
+                  subHtml =
+                    '<div class="search-subresults">' +
+                    item.matchedSections
+                      .map(function (sec) {
+                        return (
+                          '<a class="search-subresult-link" href="' +
+                          escapeHtml(sec.url) +
+                          '">§ ' +
+                          escapeHtml(sec.title) +
+                          '</a>'
+                        );
+                      })
+                      .join('') +
+                    '</div>';
+                }
+                return (
+                  '<div class="search-result-item">' +
+                  '<div class="metadata-line" style="margin-bottom:4px;">' +
+                  '<span class="metadata-category-link">' +
+                  escapeHtml(item.categoryLabel) +
+                  '</span>' +
+                  '<span class="metadata-sep">·</span>' +
+                  '<span>' +
+                  escapeHtml(item.publishedDateFormatted) +
+                  '</span>' +
+                  '</div>' +
+                  '<h3 class="search-result-title"><a href="' +
+                  escapeHtml(item.url) +
+                  '">' +
+                  escapeHtml(item.title) +
+                  '</a></h3>' +
+                  '<p style="margin:0; font-size:0.875rem; color:var(--text-muted);">' +
+                  escapeHtml(item.description) +
+                  '</p>' +
+                  subHtml +
+                  '</div>'
+                );
+              })
+              .join('');
+          } catch (err) {
+            statusEl.textContent = 'Search index unavailable.';
+          }
+        }
+
+        function openSearchDialog() {
+          if (!dialog) return;
+          if (typeof dialog.showModal === 'function' && !dialog.open) {
+            dialog.showModal();
+          } else {
+            dialog.setAttribute('open', 'true');
+          }
+          executeSearch();
+          if (searchInput) searchInput.focus();
+        }
+
+        openBtns.forEach(function (btn) {
+          btn.addEventListener('click', openSearchDialog);
+        });
+
+        if (closeBtn && dialog) {
+          closeBtn.addEventListener('click', function () {
+            dialog.close();
+          });
+        }
+
+        if (dialog) {
+          dialog.addEventListener('click', function (e) {
+            if (e.target === dialog) dialog.close();
+          });
+        }
+
+        if (searchInput) {
+          searchInput.addEventListener('input', executeSearch);
+        }
+        if (categorySelect) {
+          categorySelect.addEventListener('change', executeSearch);
+        }
+
+        document.addEventListener('keydown', function (e) {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            openSearchDialog();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

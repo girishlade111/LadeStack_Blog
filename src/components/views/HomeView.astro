@@ -1,0 +1,201 @@
+---
+import type { Locale } from '../../data/locales';
+import { CATEGORY_IDS, getCategoryMeta } from '../../data/categories';
+import { AUTHOR_REGISTRY } from '../../data/site';
+import { formatDate, getDictionary } from '../../i18n';
+import {
+  getHomeUrl,
+  getArticlesUrl,
+  getPostUrl,
+  getCategoryUrl,
+} from '../../i18n/urls';
+import {
+  getPublishedPosts,
+  getFeaturedPost,
+  getCategoryPosts,
+} from '../../lib/posts';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildStaticPageAlternates } from '../../lib/seo';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../editorial/ArticleCard.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const dict = getDictionary(locale);
+const allPosts = getPublishedPosts(locale);
+const featuredPost = getFeaturedPost(locale);
+const latestPosts = allPosts.filter(
+  (p) => !featuredPost || p.data.slug !== featuredPost.data.slug
+);
+const editorsPicks = allPosts.filter((p) => p.data.featured).slice(0, 3);
+
+const canonicalPath = getHomeUrl(locale);
+const alternates = buildStaticPageAlternates((loc) => getHomeUrl(loc));
+const localeOptions = buildLocaleSwitchOptions(locale, { staticRoute: 'home' });
+
+const featuredCategoryMeta = featuredPost
+  ? getCategoryMeta(featuredPost.data.category, locale)
+  : null;
+const featuredAuthor = featuredPost
+  ? AUTHOR_REGISTRY[featuredPost.data.authorId]
+  : null;
+---
+
+<BaseLayout
+  locale={locale}
+  title={`${dict.mastheadKicker}`}
+  description={dict.siteTagline}
+  canonicalPath={canonicalPath}
+  alternates={alternates}
+  localeOptions={localeOptions}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <p class="masthead-kicker">{dict.mastheadKicker}</p>
+      <h1 class="masthead-title">{dict.mastheadTitle}</h1>
+      <p class="masthead-subtitle">{dict.mastheadSubtitle}</p>
+    </div>
+  </section>
+
+  {
+    featuredPost && featuredCategoryMeta && (
+      <section class="featured-section" aria-label={dict.featuredStoryLabel}>
+        <div class="container featured-grid">
+          <a
+            href={getPostUrl(locale, featuredPost.data.slug)}
+            class="featured-cover-link"
+          >
+            {featuredPost.data.coverImage ? (
+              <img
+                src={featuredPost.data.coverImage}
+                alt={featuredPost.data.coverAlt || featuredPost.data.title}
+                width="800"
+                height="450"
+                fetchpriority="high"
+              />
+            ) : (
+              <div class="article-card-fallback">
+                <span>{featuredCategoryMeta.label}</span>
+                <strong>{featuredPost.data.title}</strong>
+              </div>
+            )}
+          </a>
+
+          <div>
+            <div class="metadata-line">
+              <span style="font-weight:700; color:var(--text);">
+                {dict.featuredStoryLabel}
+              </span>
+              <span class="metadata-sep" aria-hidden="true">·</span>
+              <a
+                href={getCategoryUrl(locale, featuredPost.data.category)}
+                class="metadata-category-link"
+              >
+                {featuredCategoryMeta.label}
+              </a>
+              <span class="metadata-sep" aria-hidden="true">·</span>
+              <time datetime={featuredPost.data.publishedAt.toISOString()}>
+                {formatDate(featuredPost.data.publishedAt, locale)}
+              </time>
+              <span class="metadata-sep" aria-hidden="true">·</span>
+              <span>
+                {featuredPost.readingTimeMinutes} {dict.readingTimeMinutes}
+              </span>
+            </div>
+
+            <h2 class="featured-title">
+              <a href={getPostUrl(locale, featuredPost.data.slug)}>
+                {featuredPost.data.title}
+              </a>
+            </h2>
+
+            <p class="featured-deck">
+              {featuredPost.data.summary || featuredPost.data.description}
+            </p>
+
+            <div class="metadata-line" style="margin-bottom:0;">
+              <span>
+                {dict.byAuthor} {featuredAuthor?.name ?? featuredPost.data.authorId}
+              </span>
+              <span class="metadata-sep" aria-hidden="true">·</span>
+              <a
+                href={getPostUrl(locale, featuredPost.data.slug)}
+                style="font-weight:600; color:var(--accent);"
+              >
+                {dict.readArticle} →
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    latestPosts.length > 0 && (
+      <section class="editorial-section">
+        <div class="container">
+          <div class="section-header-row">
+            <h2 class="section-heading">{dict.latestStoriesHeading}</h2>
+            <a href={getArticlesUrl(locale)} class="section-action-link">
+              {dict.viewAllArticles} →
+            </a>
+          </div>
+          <div class="articles-grid">
+            {latestPosts.map((entry) => (
+              <ArticleCard entry={entry} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {
+    editorsPicks.length > 0 && (
+      <section class="editorial-section">
+        <div class="container">
+          <div class="section-header-row">
+            <h2 class="section-heading">{dict.editorsPicksHeading}</h2>
+          </div>
+          <div class="articles-grid">
+            {editorsPicks.map((entry) => (
+              <ArticleCard entry={entry} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container">
+      <div class="section-header-row">
+        <div>
+          <h2 class="section-heading">{dict.browseCategoriesHeading}</h2>
+          <p style="margin:6px 0 0; font-size:0.9375rem; color:var(--text-muted);">
+            {dict.browseCategoriesSubtitle}
+          </p>
+        </div>
+      </div>
+
+      <div class="category-directory-grid">
+        {
+          CATEGORY_IDS.map((catId) => {
+            const meta = getCategoryMeta(catId, locale);
+            const count = getCategoryPosts(catId, locale).length;
+            return (
+              <a href={getCategoryUrl(locale, catId)} class="category-directory-item">
+                <span>{meta.label}</span>
+                <span class="category-count">{count}</span>
+              </a>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+</BaseLayout>

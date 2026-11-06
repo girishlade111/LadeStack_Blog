@@ -1,0 +1,49 @@
+---
+import type { Locale } from '../../data/locales';
+import { getDictionary } from '../../i18n';
+import { getHomeUrl, getTagUrl } from '../../i18n/urls';
+import { getTagPosts } from '../../lib/posts';
+import { buildLocaleSwitchOptions } from '../../lib/translations';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../editorial/ArticleCard.astro';
+
+interface Props {
+  locale: Locale;
+  tag: string;
+}
+
+const { locale, tag } = Astro.props;
+const dict = getDictionary(locale);
+const posts = getTagPosts(tag, locale);
+const canonicalPath = getTagUrl(locale, tag);
+const localeOptions = buildLocaleSwitchOptions(locale, { tagSlug: tag });
+---
+
+<BaseLayout
+  locale={locale}
+  title={`#${tag} — ${dict.breadcrumbTags}`}
+  description={`${dict.tagsHeading}: #${tag}`}
+  canonicalPath={canonicalPath}
+  localeOptions={localeOptions}
+>
+  <section class="editorial-masthead">
+    <div class="container">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
+        <span aria-hidden="true">/</span>
+        <span>{dict.breadcrumbTags}</span>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">#{tag}</span>
+      </nav>
+      <h1 class="masthead-title">#{tag} ({posts.length})</h1>
+    </div>
+  </section>
+
+  <section class="editorial-section" style="border-bottom:none;">
+    <div class="container">
+      <div class="articles-grid">
+        {posts.map((entry) => <ArticleCard entry={entry} />)}
+      </div>
+    </div>
+  </section>
+</BaseLayout>
