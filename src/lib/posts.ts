@@ -12,24 +12,61 @@ export function sortEntriesDeterministically(entries: readonly BlogEntry[]): Blo
   });
 }
 
-export function getPublishedPosts(locale?: Locale, includeNoindex = false): BlogEntry[] {
+let cachedSourceRef: BlogEntry[] | null = null;
+let cachedPublishedAll: BlogEntry[] = [];
+let cachedPublishedIndexable: BlogEntry[] = [];
+const cachedByLocale = new Map<string, BlogEntry[]>();
+const cachedByCategoryLocale = new Map<string, BlogEntry[]>();
+const cachedByTagLocale = new Map<string, BlogEntry[]>();
+
+function ensurePostIndexes(): void {
   const all = loadAllBlogEntries();
-  const filtered = all.filter((entry) => {
-    if (entry.data.status !== 'published') return false;
-    if (!includeNoindex && entry.data.noindex) return false;
-    if (locale && entry.data.lang !== locale) return false;
-    return true;
-  });
-  return sortEntriesDeterministically(filtered);
+  if (cachedSourceRef === all) return;
+
+  cachedSourceRef = all;
+  cachedByLocale.clear();
+  cachedByCategoryLocale.clear();
+  cachedByTagLocale.clear();
+
+  cachedPublishedAll = sortEntriesDeterministically(
+    all.filter((e) => e.data.status === 'published')
+  );
+  cachedPublishedIndexable = cachedPublishedAll.filter((e) => !e.data.noindex);
+
+  for (const entry of cachedPublishedIndexable) {
+    const loc = entry.data.lang;
+    const locList = cachedByLocale.get(loc) ?? [];
+    locList.push(entry);
+    cachedByLocale.set(loc, locList);
+
+    const catKey = `${loc}::${entry.data.category}`;
+    const catList = cachedByCategoryLocale.get(catKey) ?? [];
+    catList.push(entry);
+    cachedByCategoryLocale.set(catKey, catList);
+
+    for (const tag of entry.data.tags) {
+      const tagKey = `${loc}::${tag}`;
+      const tagList = cachedByTagLocale.get(tagKey) ?? [];
+      tagList.push(entry);
+      cachedByTagLocale.set(tagKey, tagList);
+    }
+  }
+}
+
+export function getPublishedPosts(locale?: Locale, includeNoindex = false): BlogEntry[] {
+  ensurePostIndexes();
+  if (!includeNoindex) {
+    if (!locale) return [...cachedPublishedIndexable];
+    return [...(cachedByLocale.get(locale) ?? [])];
+  }
+  if (!locale) return [...cachedPublishedAll];
+  return cachedPublishedAll.filter((e) => e.data.lang === locale);
 }
 
 export function getPostBySlug(locale: Locale, slug: string): BlogEntry | undefined {
-  const all = loadAllBlogEntries();
-  return all.find(
-    (entry) =>
-      entry.data.status === 'published' &&
-      entry.data.lang === locale &&
-      entry.data.slug === slug
+  ensurePostIndexes();
+  return cachedPublishedAll.find(
+    (entry) => entry.data.lang === locale && entry.data.slug === slug
   );
 }
 
@@ -43,15 +80,13 @@ export function getFeaturedPost(locale: Locale): BlogEntry | undefined {
 }
 
 export function getCategoryPosts(categoryId: CategoryId, locale: Locale): BlogEntry[] {
-  return getPublishedPosts(locale).filter(
-    (entry) => entry.data.category === categoryId
-  );
+  ensurePostIndexes();
+  return [...(cachedByCategoryLocale.get(`${locale}::${categoryId}`) ?? [])];
 }
 
 export function getTagPosts(tag: string, locale: Locale): BlogEntry[] {
-  return getPublishedPosts(locale).filter((entry) =>
-    entry.data.tags.includes(tag)
-  );
+  ensurePostIndexes();
+  return [...(cachedByTagLocale.get(`${locale}::${tag}`) ?? [])];
 }
 
 export function getAllPublishedTags(locale: Locale): { tag: string; count: number }[] {
@@ -64,6 +99,10 @@ export function getAllPublishedTags(locale: Locale): { tag: string; count: numbe
   return Array.from(counts.entries())
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+export function getAllTags(locale: Locale): string[] {
+  return getAllPublishedTags(locale).map((item) => item.tag);
 }
 
 export function getRelatedPosts(current: BlogEntry, limit = 3): BlogEntry[] {

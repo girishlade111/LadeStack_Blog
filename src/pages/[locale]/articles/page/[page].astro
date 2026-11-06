@@ -7,16 +7,16 @@ import ArticlesArchiveView from '../../../../components/views/ArticlesArchiveVie
 export function getStaticPaths() {
   const paths: {
     params: { locale: Locale; page: string };
-    props: { locale: Locale; pageNumber: number };
+    props: { locale: Locale; page: number };
   }[] = [];
 
   for (const locale of NON_DEFAULT_LOCALES) {
     const posts = getPublishedPosts(locale);
-    const totalPages = Math.max(1, Math.ceil(posts.length / SITE_CONFIG.postsPerPage));
+    const totalPages = Math.ceil(posts.length / SITE_CONFIG.postsPerPage);
     for (let p = 2; p <= totalPages; p++) {
       paths.push({
         params: { locale, page: String(p) },
-        props: { locale, pageNumber: p },
+        props: { locale, page: p },
       });
     }
   }
@@ -26,10 +26,10 @@ export function getStaticPaths() {
 
 interface Props {
   locale: Locale;
-  pageNumber: number;
+  page: number;
 }
 
-const { locale, pageNumber } = Astro.props;
+const { locale, page } = Astro.props;
 ---
 
-<ArticlesArchiveView locale={locale} currentPage={pageNumber} />
+<ArticlesArchiveView locale={locale} page={page} />

@@ -4,7 +4,6 @@ import { CATEGORY_IDS, getCategoryMeta } from '../../data/categories';
 import { getDictionary } from '../../i18n';
 import { getHomeUrl, getSearchUrl } from '../../i18n/urls';
 import { buildLocaleSwitchOptions } from '../../lib/translations';
-import { buildStaticPageAlternates } from '../../lib/seo';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 interface Props {
@@ -14,7 +13,6 @@ interface Props {
 const { locale } = Astro.props;
 const dict = getDictionary(locale);
 const canonicalPath = getSearchUrl(locale);
-const alternates = buildStaticPageAlternates((loc) => getSearchUrl(loc));
 const localeOptions = buildLocaleSwitchOptions(locale, {
   staticRoute: 'search',
 });
@@ -25,10 +23,11 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
   title={dict.searchDialogTitle}
   description={dict.searchIdlePrompt}
   canonicalPath={canonicalPath}
-  alternates={alternates}
+  alternates={[]}
   localeOptions={localeOptions}
+  noindex={true}
 >
-  <section class="editorial-masthead">
+  <section class="editorial-masthead" data-pagefind-ignore="all">
     <div class="container">
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
@@ -40,12 +39,13 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
     </div>
   </section>
 
-  <section class="editorial-section" style="border-bottom:none;">
+  <section class="editorial-section" style="border-bottom:none;" data-pagefind-ignore="all">
     <div class="container" style="max-width:860px; margin:0 auto;">
       <div
         id="page-search-container"
         data-page-search-locale={locale}
         data-no-results={dict.searchNoResults}
+        data-idle-prompt={dict.searchIdlePrompt}
         data-matches-label={dict.searchMatchesCount}
       >
         <div class="search-controls-row">
@@ -100,9 +100,22 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
       var select = container.querySelector('[data-page-search-category]');
       var statusEl = container.querySelector('[data-page-search-status]');
       var resultsEl = container.querySelector('[data-page-search-results]');
-      var lang = container.getAttribute('data-page-search-locale') || 'en';
       var noResultsText = container.getAttribute('data-no-results') || 'No matches.';
+      var idlePrompt = container.getAttribute('data-idle-prompt') || 'Type a keyword to search.';
       var matchesLabel = container.getAttribute('data-matches-label') || 'matches';
+      var pagefindInstance = null;
+      var debounceTimer = null;
+
+      async function ensurePagefind() {
+        if (!pagefindInstance) {
+          var pf = await import('/pagefind/pagefind.js');
+          if (typeof pf.init === 'function') {
+            await pf.init();
+          }
+          pagefindInstance = pf;
+        }
+        return pagefindInstance;
+      }
 
       function escapeHtml(str) {
         return String(str || '')
@@ -115,67 +128,118 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
       async function runPageSearch() {
         var q = input ? input.value.trim() : '';
         var cat = select ? select.value : '';
-        var runtime = await import('/pagefind/pagefind.js');
-        var items = await runtime.searchLocale(q, { lang: lang, category: cat });
-        if (statusEl) statusEl.textContent = items.length + ' ' + matchesLabel;
-        if (!resultsEl) return;
 
-        if (items.length === 0) {
-          resultsEl.innerHTML =
-            '<div class="empty-state-box"><p style="margin:0;">' +
-            escapeHtml(noResultsText) +
-            '</p></div>';
+        if (!q && !cat) {
+          if (statusEl) statusEl.textContent = idlePrompt;
+          if (resultsEl) resultsEl.innerHTML = '';
           return;
         }
 
-        resultsEl.innerHTML = items
-          .map(function (item) {
-            var subHtml = '';
-            if (item.matchedSections && item.matchedSections.length > 0) {
-              subHtml =
-                '<div class="search-subresults">' +
-                item.matchedSections
-                  .map(function (sec) {
-                    return (
-                      '<a class="search-subresult-link" href="' +
-                      escapeHtml(sec.url) +
-                      '">§ ' +
-                      escapeHtml(sec.title) +
-                      '</a>'
-                    );
-                  })
-                  .join('') +
-                '</div>';
-            }
-            return (
-              '<div class="search-result-item">' +
-              '<div class="metadata-line" style="margin-bottom:4px;">' +
-              '<span class="metadata-category-link">' +
-              escapeHtml(item.categoryLabel) +
-              '</span>' +
-              '<span class="metadata-sep">·</span>' +
-              '<span>' +
-              escapeHtml(item.publishedDateFormatted) +
-              '</span>' +
-              '</div>' +
-              '<h2 class="search-result-title"><a href="' +
-              escapeHtml(item.url) +
-              '">' +
-              escapeHtml(item.title) +
-              '</a></h2>' +
-              '<p style="margin:0; font-size:0.9375rem; color:var(--text-muted);">' +
-              escapeHtml(item.description) +
-              '</p>' +
-              subHtml +
-              '</div>'
-            );
-          })
-          .join('');
+        try {
+          var pf = await ensurePagefind();
+          var searchTerm = q ? q : null;
+          var searchOpts = {};
+          if (cat) {
+            searchOpts.filters = { category: [cat] };
+          }
+          var response = await pf.search(searchTerm, searchOpts);
+          var rawResults = (response && response.results) ? response.results : [];
+          if (statusEl) statusEl.textContent = rawResults.length + ' ' + matchesLabel;
+          if (!resultsEl) return;
+
+          if (rawResults.length === 0) {
+            resultsEl.innerHTML =
+              '<div class="empty-state-box"><p style="margin:0;">' +
+              escapeHtml(noResultsText) +
+              '</p></div>';
+            return;
+          }
+
+          var items = await Promise.all(
+            rawResults.slice(0, 20).map(function (r) {
+              return r.data();
+            })
+          );
+
+          resultsEl.innerHTML = items
+            .map(function (item) {
+              var meta = item.meta || {};
+              var subResults = Array.isArray(item.sub_results)
+                ? item.sub_results.filter(function (s) {
+                    return s.url !== item.url;
+                  }).slice(0, 3)
+                : [];
+
+              var subHtml = '';
+              if (subResults.length > 0) {
+                subHtml =
+                  '<div class="search-subresults">' +
+                  subResults
+                    .map(function (sec) {
+                      return (
+                        '<a class="search-subresult-link" href="' +
+                        escapeHtml(sec.url) +
+                        '">§ ' +
+                        escapeHtml(sec.title) +
+                        '</a>'
+                      );
+                    })
+                    .join('') +
+                  '</div>';
+              }
+
+              var metaLine = '';
+              if (meta.categoryLabel || meta.publishedDate) {
+                metaLine =
+                  '<div class="metadata-line" style="margin-bottom:4px;">' +
+                  (meta.categoryLabel
+                    ? '<span class="metadata-category-link">' + escapeHtml(meta.categoryLabel) + '</span>'
+                    : '') +
+                  (meta.categoryLabel && meta.publishedDate
+                    ? '<span class="metadata-sep">·</span>'
+                    : '') +
+                  (meta.publishedDate
+                    ? '<span>' + escapeHtml(meta.publishedDate) + '</span>'
+                    : '') +
+                  '</div>';
+              }
+
+              return (
+                '<div class="search-result-item">' +
+                metaLine +
+                '<h2 class="search-result-title"><a href="' +
+                escapeHtml(item.url) +
+                '">' +
+                escapeHtml(meta.title || item.url) +
+                '</a></h2>' +
+                '<p style="margin:0; font-size:0.9375rem; color:var(--text-muted);">' +
+                (item.excerpt || escapeHtml(meta.description || '')) +
+                '</p>' +
+                subHtml +
+                '</div>'
+              );
+            })
+            .join('');
+        } catch (err) {
+          if (statusEl) statusEl.textContent = 'Search index unavailable.';
+        }
       }
 
-      if (input) input.addEventListener('input', runPageSearch);
+      function schedulePageSearch() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(runPageSearch, 180);
+      }
+
+      if (input) input.addEventListener('input', schedulePageSearch);
       if (select) select.addEventListener('change', runPageSearch);
-      runPageSearch();
+
+      // Check ?q= query parameter on load
+      var params = new URLSearchParams(window.location.search);
+      var initialQ = params.get('q');
+      if (initialQ && input) {
+        input.value = initialQ;
+        runPageSearch();
+      }
     })();
   </script>
 </BaseLayout>

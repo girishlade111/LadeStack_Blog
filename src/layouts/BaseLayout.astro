@@ -1,10 +1,14 @@
 ---
+import '@fontsource-variable/fraunces';
+import '@fontsource-variable/plus-jakarta-sans';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
 import '../styles/global.css';
 import { LOCALE_REGISTRY, type Locale } from '../data/locales';
 import { SITE_CONFIG } from '../data/site';
 import { getDictionary } from '../i18n';
 import { buildCanonicalUrl } from '../i18n/urls';
-import type { HreflangAlternate } from '../lib/seo';
+import { resolveSocialImageUrl, type HreflangAlternate } from '../lib/seo';
 import type { LocaleSwitchOption } from '../lib/translations';
 import SiteHeader from '../components/shell/SiteHeader.astro';
 import SearchDialog from '../components/shell/SearchDialog.astro';
@@ -19,6 +23,9 @@ interface Props {
   localeOptions: LocaleSwitchOption[];
   ogType?: 'website' | 'article';
   ogImage?: string;
+  ogImageAlt?: string;
+  articleSection?: string;
+  articleTags?: string[];
   publishedTime?: string;
   modifiedTime?: string;
   noindex?: boolean;
@@ -34,6 +41,9 @@ const {
   localeOptions,
   ogType = 'website',
   ogImage = SITE_CONFIG.defaultOgImage,
+  ogImageAlt,
+  articleSection,
+  articleTags = [],
   publishedTime,
   modifiedTime,
   noindex = false,
@@ -43,10 +53,15 @@ const {
 const dict = getDictionary(locale);
 const htmlLang = LOCALE_REGISTRY[locale].htmlLang;
 const canonicalUrl = buildCanonicalUrl(canonicalPath);
-const absoluteOgImage = buildCanonicalUrl(ogImage);
+const absoluteOgImage = resolveSocialImageUrl(ogImage);
 const fullTitle = title.includes(SITE_CONFIG.name)
   ? title
   : `${title} — ${SITE_CONFIG.name}`;
+const resolvedImageAlt = ogImageAlt || fullTitle;
+const safeAlternates = noindex ? [] : alternates;
+const ogAlternateLocales = safeAlternates
+  .filter((alt) => alt.hreflang !== 'x-default' && alt.hreflang !== locale)
+  .map((alt) => LOCALE_REGISTRY[alt.hreflang as Locale].dateLocale.replace('-', '_'));
 ---
 
 <!doctype html>
@@ -63,7 +78,7 @@ const fullTitle = title.includes(SITE_CONFIG.name)
     {noindex && <meta name="robots" content="noindex, follow" />}
 
     {
-      alternates.map((alt) => (
+      safeAlternates.map((alt) => (
         <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />
       ))
     }
@@ -74,22 +89,29 @@ const fullTitle = title.includes(SITE_CONFIG.name)
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={absoluteOgImage} />
+    <meta property="og:image:alt" content={resolvedImageAlt} />
+    <meta property="og:image:width" content={String(SITE_CONFIG.defaultOgImageWidth)} />
+    <meta property="og:image:height" content={String(SITE_CONFIG.defaultOgImageHeight)} />
     <meta property="og:locale" content={LOCALE_REGISTRY[locale].dateLocale.replace('-', '_')} />
+    {
+      ogAlternateLocales.map((altLoc) => (
+        <meta property="og:locale:alternate" content={altLoc} />
+      ))
+    }
 
     {publishedTime && <meta property="article:published_time" content={publishedTime} />}
     {modifiedTime && <meta property="article:modified_time" content={modifiedTime} />}
+    {ogType === 'article' && articleSection && <meta property="article:section" content={articleSection} />}
+    {
+      ogType === 'article' &&
+        articleTags.map((tag) => <meta property="article:tag" content={tag} />)
+    }
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={absoluteOgImage} />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="twitter:image:alt" content={resolvedImageAlt} />
 
     <script is:inline>
       (function () {
@@ -188,7 +210,15 @@ const fullTitle = title.includes(SITE_CONFIG.name)
           });
         });
 
-        // 3. Universal Search Dialog (Lazy-loads /pagefind/pagefind.js on open)
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') {
+            document.querySelectorAll('details[data-nav-dropdown][open]').forEach(function (el) {
+              el.removeAttribute('open');
+            });
+          }
+        });
+
+        // 3. Universal Search Dialog (Lazy-loads official /pagefind/pagefind.js on open)
         var dialog = document.getElementById('site-search-dialog');
         var openBtns = document.querySelectorAll('[data-open-search]');
         var closeBtn = document.querySelector('[data-close-search]');
@@ -196,13 +226,18 @@ const fullTitle = title.includes(SITE_CONFIG.name)
         var categorySelect = document.querySelector('[data-search-category]');
         var statusEl = document.querySelector('[data-search-status]');
         var resultsEl = document.querySelector('[data-search-results]');
-        var pagefindModule = null;
+        var pagefindInstance = null;
+        var debounceTimer = null;
 
-        async function ensureSearchRuntime() {
-          if (!pagefindModule) {
-            pagefindModule = await import('/pagefind/pagefind.js');
+        async function ensurePagefind() {
+          if (!pagefindInstance) {
+            var pf = await import('/pagefind/pagefind.js');
+            if (typeof pf.init === 'function') {
+              await pf.init();
+            }
+            pagefindInstance = pf;
           }
-          return pagefindModule;
+          return pagefindInstance;
         }
 
         function escapeHtml(str) {
@@ -217,16 +252,29 @@ const fullTitle = title.includes(SITE_CONFIG.name)
           if (!dialog || !searchInput || !resultsEl || !statusEl) return;
           var q = searchInput.value.trim();
           var cat = categorySelect ? categorySelect.value : '';
-          var lang = dialog.getAttribute('data-search-locale') || document.documentElement.lang || 'en';
           var noResultsText = dialog.getAttribute('data-no-results') || 'No matches.';
+          var idlePrompt = dialog.getAttribute('data-idle-prompt') || 'Type a keyword to search.';
           var matchesLabel = dialog.getAttribute('data-matches-label') || 'matches';
 
           try {
-            var runtime = await ensureSearchRuntime();
-            var items = await runtime.searchLocale(q, { lang: lang, category: cat });
-            statusEl.textContent = items.length + ' ' + matchesLabel;
+            var pf = await ensurePagefind();
+            var searchTerm = q ? q : null;
+            var searchOpts = {};
+            if (cat) {
+              searchOpts.filters = { category: [cat] };
+            }
 
-            if (items.length === 0) {
+            if (!searchTerm && !cat) {
+              statusEl.textContent = idlePrompt;
+              resultsEl.innerHTML = '';
+              return;
+            }
+
+            var response = await pf.search(searchTerm, searchOpts);
+            var rawResults = (response && response.results) ? response.results : [];
+            statusEl.textContent = rawResults.length + ' ' + matchesLabel;
+
+            if (rawResults.length === 0) {
               resultsEl.innerHTML =
                 '<div class="empty-state-box"><p style="margin:0;">' +
                 escapeHtml(noResultsText) +
@@ -234,13 +282,26 @@ const fullTitle = title.includes(SITE_CONFIG.name)
               return;
             }
 
-            resultsEl.innerHTML = items
+            var topItems = await Promise.all(
+              rawResults.slice(0, 12).map(function (r) {
+                return r.data();
+              })
+            );
+
+            resultsEl.innerHTML = topItems
               .map(function (item) {
+                var meta = item.meta || {};
+                var subResults = Array.isArray(item.sub_results)
+                  ? item.sub_results.filter(function (s) {
+                      return s.url !== item.url;
+                    }).slice(0, 3)
+                  : [];
+
                 var subHtml = '';
-                if (item.matchedSections && item.matchedSections.length > 0) {
+                if (subResults.length > 0) {
                   subHtml =
                     '<div class="search-subresults">' +
-                    item.matchedSections
+                    subResults
                       .map(function (sec) {
                         return (
                           '<a class="search-subresult-link" href="' +
@@ -253,24 +314,33 @@ const fullTitle = title.includes(SITE_CONFIG.name)
                       .join('') +
                     '</div>';
                 }
+
+                var metaLine = '';
+                if (meta.categoryLabel || meta.publishedDate) {
+                  metaLine =
+                    '<div class="metadata-line" style="margin-bottom:4px;">' +
+                    (meta.categoryLabel
+                      ? '<span class="metadata-category-link">' + escapeHtml(meta.categoryLabel) + '</span>'
+                      : '') +
+                    (meta.categoryLabel && meta.publishedDate
+                      ? '<span class="metadata-sep">·</span>'
+                      : '') +
+                    (meta.publishedDate
+                      ? '<span>' + escapeHtml(meta.publishedDate) + '</span>'
+                      : '') +
+                    '</div>';
+                }
+
                 return (
                   '<div class="search-result-item">' +
-                  '<div class="metadata-line" style="margin-bottom:4px;">' +
-                  '<span class="metadata-category-link">' +
-                  escapeHtml(item.categoryLabel) +
-                  '</span>' +
-                  '<span class="metadata-sep">·</span>' +
-                  '<span>' +
-                  escapeHtml(item.publishedDateFormatted) +
-                  '</span>' +
-                  '</div>' +
+                  metaLine +
                   '<h3 class="search-result-title"><a href="' +
                   escapeHtml(item.url) +
                   '">' +
-                  escapeHtml(item.title) +
+                  escapeHtml(meta.title || item.url) +
                   '</a></h3>' +
                   '<p style="margin:0; font-size:0.875rem; color:var(--text-muted);">' +
-                  escapeHtml(item.description) +
+                  (item.excerpt || escapeHtml(meta.description || '')) +
                   '</p>' +
                   subHtml +
                   '</div>'
@@ -282,6 +352,11 @@ const fullTitle = title.includes(SITE_CONFIG.name)
           }
         }
 
+        function scheduleSearch() {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(executeSearch, 180);
+        }
+
         function openSearchDialog() {
           if (!dialog) return;
           if (typeof dialog.showModal === 'function' && !dialog.open) {
@@ -289,7 +364,14 @@ const fullTitle = title.includes(SITE_CONFIG.name)
           } else {
             dialog.setAttribute('open', 'true');
           }
-          executeSearch();
+          ensurePagefind().then(function () {
+            if (
+              (searchInput && searchInput.value.trim()) ||
+              (categorySelect && categorySelect.value)
+            ) {
+              executeSearch();
+            }
+          });
           if (searchInput) searchInput.focus();
         }
 
@@ -310,7 +392,7 @@ const fullTitle = title.includes(SITE_CONFIG.name)
         }
 
         if (searchInput) {
-          searchInput.addEventListener('input', executeSearch);
+          searchInput.addEventListener('input', scheduleSearch);
         }
         if (categorySelect) {
           categorySelect.addEventListener('change', executeSearch);

@@ -7,13 +7,22 @@ import {
   getPostUrl,
   getCategoryUrl,
   buildCanonicalUrl,
+  buildAssetUrl,
+  isAssetPath,
 } from '../i18n/urls';
 import { loadAllBlogEntries, slugifyHeading, renderMarkdownWithToc } from './content-loader';
 import { getPublishedPosts, getPostBySlug } from './posts';
 import { buildLocaleSwitchOptions } from './translations';
-import { buildArticleAlternates, buildWebsiteJsonLd } from './seo';
-import { paginateItems } from './pagination';
-import { articleFrontmatterSchema } from './validators';
+import {
+  buildArticleAlternates,
+  buildCategoryAlternates,
+  buildTagAlternates,
+  isTagArchiveIndexable,
+  resolveSocialImageUrl,
+  buildWebsiteJsonLd,
+} from './seo';
+import { paginateItems, isValidPageNumber } from './pagination';
+import { articleFrontmatterSchema, validateContentIndex } from './validators';
 
 test('supports exactly the 9 locked locales with English as unprefixed default', () => {
   assert.equal(SUPPORTED_LOCALES.length, 9);
@@ -24,6 +33,37 @@ test('supports exactly the 9 locked locales with English as unprefixed default',
   assert.equal(getHomeUrl('ja'), '/ja/');
   assert.equal(getPostUrl('en', 'astro-seo-basics'), '/posts/astro-seo-basics/');
   assert.equal(getPostUrl('fr', 'guide-seo-astro'), '/fr/posts/guide-seo-astro/');
+});
+
+test('separates canonical page URLs from static asset URLs without trailing slashes on assets', () => {
+  assert.equal(isAssetPath('/images/covers/astro-seo-architecture.svg'), true);
+  assert.equal(isAssetPath('/og-default.png'), true);
+  assert.equal(isAssetPath('/posts/astro-seo-basics/'), false);
+
+  assert.equal(
+    buildCanonicalUrl('/posts/astro-seo-basics'),
+    'https://blog.ladestack.in/posts/astro-seo-basics/'
+  );
+  assert.equal(
+    buildCanonicalUrl('/posts/astro-seo-basics?ref=rss#section'),
+    'https://blog.ladestack.in/posts/astro-seo-basics/?ref=rss#section'
+  );
+  assert.equal(
+    buildAssetUrl('/images/covers/astro-seo-architecture.svg'),
+    'https://blog.ladestack.in/images/covers/astro-seo-architecture.svg'
+  );
+  assert.equal(
+    buildAssetUrl('/og-default.png'),
+    'https://blog.ladestack.in/og-default.png'
+  );
+  assert.equal(
+    resolveSocialImageUrl('/images/covers/astro-seo-architecture.svg'),
+    'https://blog.ladestack.in/images/covers/astro-seo-architecture.png'
+  );
+  assert.equal(
+    resolveSocialImageUrl(undefined),
+    'https://blog.ladestack.in/og-default.png'
+  );
 });
 
 test('supports all 19 permanent categories with localized labels across all 9 locales', () => {
@@ -40,16 +80,19 @@ test('supports all 19 permanent categories with localized labels across all 9 lo
   assert.equal(getCategoryUrl('fr', 'technology', 2), '/fr/category/technology/page/2/');
 });
 
-test('loads and validates all Markdown content entries and excludes drafts from published queries', () => {
+test('loads and validates all Markdown content entries, enforces translation structural parity, and excludes drafts', () => {
   const allEntries = loadAllBlogEntries(true);
   const publishedEntries = getPublishedPosts();
 
   assert.ok(allEntries.length > publishedEntries.length, 'Should include at least one draft test file');
   const draftFr = getPostBySlug('fr', 'corridors-ferroviaires-grande-vitesse');
   assert.equal(draftFr, undefined, 'Draft French article must never appear in getPostBySlug');
+
+  const errors = validateContentIndex(allEntries);
+  assert.deepEqual(errors, [], `Expected 0 validation errors across content corpus, got: ${errors.join('; ')}`);
 });
 
-test('builds reciprocal hreflang alternates only for published variants and handles English-only stories', () => {
+test('builds reciprocal hreflang alternates only for published variants and indexable categories/tags', () => {
   const astroAlts = buildArticleAlternates('astro-seo-basics');
   const langs = astroAlts.map((a) => a.hreflang);
   assert.ok(langs.includes('en'));
@@ -69,6 +112,21 @@ test('builds reciprocal hreflang alternates only for published variants and hand
     railAlts[0].href,
     buildCanonicalUrl('/posts/high-speed-rail-corridors/')
   );
+
+  // Empty category must return 0 alternates so noindex pages never appear in hreflang
+  const gamingAlts = buildCategoryAlternates('gaming', 1);
+  assert.equal(gamingAlts.length, 0);
+
+  // Category with posts in a subset of locales only includes those non-empty locales
+  const techAlts = buildCategoryAlternates('technology', 1);
+  const techLangs = techAlts.map((a) => a.hreflang);
+  assert.ok(techLangs.includes('en'));
+  assert.ok(techLangs.includes('ja'));
+  assert.ok(!techLangs.includes('ko'), 'Empty ko/category/technology/ must be excluded from hreflang');
+
+  // Thin tag with 1 post is noindex and returns 0 alternates
+  assert.equal(isTagArchiveIndexable('en', 'astro'), false);
+  assert.equal(buildTagAlternates('astro').length, 0);
 });
 
 test('locale switcher links to translated article when published, and falls back honestly to locale home when unavailable', () => {
@@ -84,7 +142,7 @@ test('locale switcher links to translated article when published, and falls back
   assert.equal(koOption?.href, '/ko/');
 });
 
-test('extracts H2 and H3 headings with deterministic slugs, disambiguates duplicate headings, and paginates deterministically', () => {
+test('extracts H2 and H3 headings with deterministic slugs, disambiguates duplicate headings, and strictly bounds pagination', () => {
   const enArticle = getPostBySlug('en', 'astro-seo-basics');
   assert.ok(enArticle);
   assert.ok(enArticle.headings.length >= 4);
@@ -101,6 +159,10 @@ test('extracts H2 and H3 headings with deterministic slugs, disambiguates duplic
   assert.equal(paged.totalPages, 3);
   assert.equal(paged.hasPrev, true);
   assert.equal(paged.hasNext, true);
+
+  assert.equal(isValidPageNumber(1, 1), true);
+  assert.equal(isValidPageNumber(2, 1), false);
+  assert.throws(() => paginateItems([1, 2], 2, 6), RangeError);
 });
 
 test('frontmatter schema rejects invalid categories, locales, slugs, and unknown authors', () => {

@@ -10,7 +10,7 @@ import {
 import { getCategoryPosts } from '../../lib/posts';
 import { paginateItems } from '../../lib/pagination';
 import { buildLocaleSwitchOptions } from '../../lib/translations';
-import { buildStaticPageAlternates, buildBreadcrumbJsonLd } from '../../lib/seo';
+import { buildCategoryAlternates, buildBreadcrumbJsonLd } from '../../lib/seo';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ArticleCard from '../editorial/ArticleCard.astro';
 
@@ -26,10 +26,11 @@ const categoryMeta = getCategoryMeta(categoryId, locale);
 const allCategoryPosts = getCategoryPosts(categoryId, locale);
 const pagination = paginateItems(allCategoryPosts, page, SITE_CONFIG.postsPerPage);
 
+const isNoindex = allCategoryPosts.length === 0;
 const canonicalPath = getCategoryUrl(locale, categoryId, pagination.currentPage);
-const alternates = buildStaticPageAlternates((loc) =>
-  getCategoryUrl(loc, categoryId, 1)
-);
+const alternates = isNoindex
+  ? []
+  : buildCategoryAlternates(categoryId, locale, pagination.currentPage);
 const localeOptions = buildLocaleSwitchOptions(locale, {
   categorySlug: categoryId,
 });
@@ -52,7 +53,7 @@ const activeCategories = CATEGORY_IDS.filter(
   canonicalPath={canonicalPath}
   alternates={alternates}
   localeOptions={localeOptions}
-  noindex={allCategoryPosts.length === 0}
+  noindex={isNoindex}
   jsonLd={[buildBreadcrumbJsonLd(crumbs)]}
 >
   <section class="editorial-masthead">

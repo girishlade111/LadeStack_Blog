@@ -6,7 +6,7 @@ import { getHomeUrl, getArticlesUrl } from '../../i18n/urls';
 import { getPublishedPosts } from '../../lib/posts';
 import { paginateItems } from '../../lib/pagination';
 import { buildLocaleSwitchOptions } from '../../lib/translations';
-import { buildStaticPageAlternates } from '../../lib/seo';
+import { buildArticlesArchiveAlternates } from '../../lib/seo';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ArticleCard from '../editorial/ArticleCard.astro';
 
@@ -21,7 +21,7 @@ const allPosts = getPublishedPosts(locale);
 const pagination = paginateItems(allPosts, page, SITE_CONFIG.postsPerPage);
 
 const canonicalPath = getArticlesUrl(locale, pagination.currentPage);
-const alternates = buildStaticPageAlternates((loc) => getArticlesUrl(loc, 1));
+const alternates = buildArticlesArchiveAlternates(locale, pagination.currentPage);
 const localeOptions = buildLocaleSwitchOptions(locale, {
   staticRoute: 'articles',
 });
@@ -29,7 +29,7 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
 
 <BaseLayout
   locale={locale}
-  title={dict.allArticlesTitle}
+  title={`${dict.allArticlesTitle}${pagination.currentPage > 1 ? ` (${dict.paginationPageOf} ${pagination.currentPage})` : ''}`}
   description={dict.allArticlesDescription}
   canonicalPath={canonicalPath}
   alternates={alternates}

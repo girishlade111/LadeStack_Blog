@@ -43,6 +43,7 @@ const localeOptions = buildLocaleSwitchOptions(locale, {
   translationKey: entry.data.translationKey,
 });
 const relatedPosts = getRelatedPosts(entry, 3);
+const formattedPubDate = formatDate(entry.data.publishedAt, locale);
 
 const crumbs = [
   { label: dict.breadcrumbHome, href: getHomeUrl(locale) },
@@ -68,6 +69,9 @@ const jsonLd = [
   localeOptions={localeOptions}
   ogType="article"
   ogImage={entry.data.coverImage}
+  ogImageAlt={entry.data.coverAlt || entry.data.title}
+  articleSection={categoryMeta.label}
+  articleTags={entry.data.tags}
   publishedTime={entry.data.publishedAt.toISOString()}
   modifiedTime={(entry.data.updatedAt ?? entry.data.publishedAt).toISOString()}
   noindex={entry.data.noindex}
@@ -78,6 +82,16 @@ const jsonLd = [
   </div>
 
   <article class="article-page-wrapper" data-pagefind-body>
+    <meta data-pagefind-filter="category[content]" content={entry.data.category} />
+    <meta data-pagefind-meta="categoryLabel[content]" content={categoryMeta.label} />
+    <meta data-pagefind-meta="publishedDate[content]" content={formattedPubDate} />
+    <meta data-pagefind-meta="description[content]" content={entry.data.description} />
+    {
+      entry.data.tags.map((tag) => (
+        <meta data-pagefind-filter="tag[content]" content={tag} />
+      ))
+    }
+
     <div class="container">
       <nav class="breadcrumbs" aria-label="Breadcrumb" data-pagefind-ignore>
         <a href={getHomeUrl(locale)}>{dict.breadcrumbHome}</a>
@@ -90,11 +104,10 @@ const jsonLd = [
       </nav>
 
       <header class="article-header">
-        <div class="metadata-line">
+        <div class="metadata-line" data-pagefind-ignore>
           <a
             href={getCategoryUrl(locale, entry.data.category)}
             class="metadata-category-link"
-            data-pagefind-meta="category"
           >
             {categoryMeta.label}
           </a>
@@ -102,7 +115,7 @@ const jsonLd = [
           <span>
             {dict.publishedOn}{' '}
             <time datetime={entry.data.publishedAt.toISOString()}>
-              {formatDate(entry.data.publishedAt, locale)}
+              {formattedPubDate}
             </time>
           </span>
           {
@@ -122,7 +135,7 @@ const jsonLd = [
           <span>{entry.readingTimeMinutes} {dict.readingTimeMinutes}</span>
         </div>
 
-        <h1 class="article-h1">{entry.data.title}</h1>
+        <h1 class="article-h1" data-pagefind-meta="title">{entry.data.title}</h1>
         <p class="article-deck">{entry.data.summary || entry.data.description}</p>
 
         <div class="article-byline-bar" data-pagefind-ignore>
@@ -151,7 +164,7 @@ const jsonLd = [
         <div>
           {
             entry.data.coverImage && (
-              <figure class="article-cover-figure">
+              <figure class="article-cover-figure" data-pagefind-ignore>
                 <div class="article-cover-frame">
                   <img
                     src={entry.data.coverImage}
@@ -159,6 +172,7 @@ const jsonLd = [
                     width="960"
                     height="540"
                     fetchpriority="high"
+                    decoding="async"
                   />
                 </div>
                 {entry.data.coverCredit && (

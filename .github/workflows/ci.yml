@@ -1,0 +1,48 @@
+name: LadeStack Blog CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    name: Validate, Build & Audit Static Output
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Validate Markdown content & translation invariants
+        run: npm run validate:content
+
+      - name: Run Astro & TypeScript checks
+        run: npm run lint
+
+      - name: Run unit and regression test suite
+        run: npm test
+
+      - name: Build static Astro site and official Pagefind index
+        run: npm run build
+
+      - name: Verify SEO canonicals and reciprocal hreflang
+        run: npm run verify:seo
+
+      - name: Audit generated HTML, sitemap, social images, and Pagefind assets
+        run: npm run verify:output
+
+      - name: Audit internal links and heading anchors
+        run: npm run verify:links

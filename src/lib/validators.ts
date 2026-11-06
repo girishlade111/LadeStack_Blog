@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { SUPPORTED_LOCALES, type Locale } from '../data/locales';
 import { CATEGORY_IDS, type CategoryId } from '../data/categories';
@@ -29,6 +31,7 @@ export const articleFrontmatterSchema = z.object({
       message: 'authorId must exist in AUTHOR_REGISTRY',
     }),
   status: z.enum(['draft', 'review', 'published']),
+  translationType: z.enum(['full', 'adaptation', 'summary']).default('full'),
   publishedAt: z.coerce.date(),
   updatedAt: z.coerce.date().optional(),
   reviewedAt: z.coerce.date().optional(),
@@ -99,11 +102,20 @@ export function validateContentIndex(entries: readonly BlogEntry[]): string[] {
       );
     }
 
-    // Cover image requires coverAlt if coverImage is provided
-    if (data.coverImage && (!data.coverAlt || !data.coverAlt.trim())) {
-      errors.push(
-        `[${filePath}] coverAlt is required when coverImage is provided.`
-      );
+    // Cover image requires coverAlt and physical file in public/
+    if (data.coverImage) {
+      if (!data.coverAlt || !data.coverAlt.trim()) {
+        errors.push(
+          `[${filePath}] coverAlt is required when coverImage is provided.`
+        );
+      }
+      const cleanRel = data.coverImage.replace(/^\/+/, '');
+      const absCoverPath = path.resolve(process.cwd(), 'public', cleanRel);
+      if (!fs.existsSync(absCoverPath)) {
+        errors.push(
+          `[${filePath}] coverImage "${data.coverImage}" does not exist at public/${cleanRel}.`
+        );
+      }
     }
 
     // Invariant 8: updatedAt cannot precede publishedAt
@@ -166,7 +178,7 @@ export function validateContentIndex(entries: readonly BlogEntry[]): string[] {
     }
   }
 
-  // Invariant 3 & 7: Every group with a published translation must have a published English original
+  // Invariant 3, 7 & Translation Structural Completeness
   for (const [translationKey, group] of groups.entries()) {
     const enEntry = group.variants.get('en');
     const publishedNonEn = Array.from(group.variants.values()).filter(
@@ -181,6 +193,9 @@ export function validateContentIndex(entries: readonly BlogEntry[]): string[] {
             .join(', ')}), but the English original is missing or not published.`
         );
       } else {
+        const enTableLines = (enEntry.body.match(/^\|/gm) ?? []).length;
+        const enCodeFences = (enEntry.body.match(/```/g) ?? []).length;
+
         for (const variant of publishedNonEn) {
           if (
             variant.data.publishedAt.getTime() <
@@ -189,6 +204,31 @@ export function validateContentIndex(entries: readonly BlogEntry[]): string[] {
             errors.push(
               `[${variant.filePath}] Translation publishedAt (${variant.data.publishedAt.toISOString()}) precedes English original publishedAt (${enEntry.data.publishedAt.toISOString()}).`
             );
+          }
+
+          if (variant.data.translationType === 'full') {
+            if (variant.headings.length !== enEntry.headings.length) {
+              errors.push(
+                `[${variant.filePath}] Incomplete translation heading structure: found ${variant.headings.length} H2/H3 headings, expected ${enEntry.headings.length} matching English source.`
+              );
+            }
+            const varTableLines = (variant.body.match(/^\|/gm) ?? []).length;
+            if (varTableLines !== enTableLines) {
+              errors.push(
+                `[${variant.filePath}] Incomplete translation table structure: found ${varTableLines} table rows, expected ${enTableLines} matching English source.`
+              );
+            }
+            const varCodeFences = (variant.body.match(/```/g) ?? []).length;
+            if (varCodeFences !== enCodeFences) {
+              errors.push(
+                `[${variant.filePath}] Incomplete translation code blocks: found ${varCodeFences / 2} code blocks, expected ${enCodeFences / 2} matching English source.`
+              );
+            }
+            if (variant.data.sources.length !== enEntry.data.sources.length) {
+              errors.push(
+                `[${variant.filePath}] Incomplete translation citations: found ${variant.data.sources.length} sources, expected ${enEntry.data.sources.length} matching English source.`
+              );
+            }
           }
         }
       }

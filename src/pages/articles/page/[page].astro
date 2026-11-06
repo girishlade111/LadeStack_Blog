@@ -5,13 +5,13 @@ import ArticlesArchiveView from '../../../components/views/ArticlesArchiveView.a
 
 export function getStaticPaths() {
   const posts = getPublishedPosts('en');
-  const totalPages = Math.max(1, Math.ceil(posts.length / SITE_CONFIG.postsPerPage));
-  const paths: { params: { page: string }; props: { pageNumber: number } }[] = [];
+  const totalPages = Math.ceil(posts.length / SITE_CONFIG.postsPerPage);
+  const paths: { params: { page: string }; props: { page: number } }[] = [];
 
   for (let p = 2; p <= totalPages; p++) {
     paths.push({
       params: { page: String(p) },
-      props: { pageNumber: p },
+      props: { page: p },
     });
   }
 
@@ -19,10 +19,10 @@ export function getStaticPaths() {
 }
 
 interface Props {
-  pageNumber: number;
+  page: number;
 }
 
-const { pageNumber } = Astro.props;
+const { page } = Astro.props;
 ---
 
-<ArticlesArchiveView locale="en" currentPage={pageNumber} />
+<ArticlesArchiveView locale="en" page={page} />

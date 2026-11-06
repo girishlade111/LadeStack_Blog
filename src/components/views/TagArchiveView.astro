@@ -4,6 +4,7 @@ import { getDictionary } from '../../i18n';
 import { getHomeUrl, getTagUrl } from '../../i18n/urls';
 import { getTagPosts } from '../../lib/posts';
 import { buildLocaleSwitchOptions } from '../../lib/translations';
+import { buildTagAlternates, isTagArchiveIndexable } from '../../lib/seo';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ArticleCard from '../editorial/ArticleCard.astro';
 
@@ -16,15 +17,19 @@ const { locale, tag } = Astro.props;
 const dict = getDictionary(locale);
 const posts = getTagPosts(tag, locale);
 const canonicalPath = getTagUrl(locale, tag);
+const isIndexable = isTagArchiveIndexable(tag, locale);
+const alternates = isIndexable ? buildTagAlternates(tag, locale) : [];
 const localeOptions = buildLocaleSwitchOptions(locale, { tagSlug: tag });
 ---
 
 <BaseLayout
   locale={locale}
   title={`#${tag} — ${dict.breadcrumbTags}`}
-  description={`${dict.tagsHeading}: #${tag}`}
+  description={`${dict.tagsHeading}: #${tag} (${posts.length})`}
   canonicalPath={canonicalPath}
+  alternates={alternates}
   localeOptions={localeOptions}
+  noindex={!isIndexable}
 >
   <section class="editorial-masthead">
     <div class="container">

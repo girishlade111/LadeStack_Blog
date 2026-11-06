@@ -5,7 +5,10 @@ export const SITE_CONFIG = {
   origin: 'https://blog.ladestack.in',
   defaultLocale: 'en' as const,
   postsPerPage: 12,
-  defaultOgImage: '/og-default.svg',
+  minIndexableTagPosts: 3,
+  defaultOgImage: '/og-default.png',
+  defaultOgImageWidth: 1200,
+  defaultOgImageHeight: 630,
   contactEmail: 'editorial@ladestack.in',
   githubRepo: 'https://github.com/girishlade111',
 } as const;

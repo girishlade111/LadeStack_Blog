@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { CATEGORY_IDS } from '../src/data/categories';
 import { SUPPORTED_LOCALES } from '../src/data/locales';
 import { loadAllBlogEntries } from '../src/lib/content-loader';
+import { getPostsByCategory } from '../src/lib/posts';
 
 const DIST_DIR = path.resolve(process.cwd(), 'dist');
 
@@ -33,18 +35,42 @@ function main() {
     errors.push('Forbidden duplicate /en/ directory found in dist/. English must be unprefixed.');
   }
 
-  // 2. Ensure Pagefind search index exists for all 9 locales
+  // 2. Ensure official Pagefind search bundle exists and legacy index-*.json files do not exist
   const pagefindDir = path.join(DIST_DIR, 'pagefind');
   if (!fs.existsSync(path.join(pagefindDir, 'pagefind.js'))) {
     errors.push('Missing dist/pagefind/pagefind.js');
   }
+  if (!fs.existsSync(path.join(pagefindDir, 'pagefind-entry.json'))) {
+    errors.push('Missing official Pagefind manifest: dist/pagefind/pagefind-entry.json');
+  }
+  const pagefindFiles = fs.existsSync(pagefindDir) ? fs.readdirSync(pagefindDir) : [];
+  if (!pagefindFiles.some((f) => f.endsWith('.pagefind') || f.endsWith('.pf_meta') || f.endsWith('.pf_index'))) {
+    errors.push('Missing official Pagefind WASM/index chunks in dist/pagefind/');
+  }
   for (const locale of SUPPORTED_LOCALES) {
-    if (!fs.existsSync(path.join(pagefindDir, `index-${locale}.json`))) {
-      errors.push(`Missing Pagefind locale index: dist/pagefind/index-${locale}.json`);
+    if (fs.existsSync(path.join(pagefindDir, `index-${locale}.json`))) {
+      errors.push(`Legacy custom JSON search file still present: dist/pagefind/index-${locale}.json`);
     }
   }
 
-  // 3. Ensure draft entries do NOT appear in dist/ or dist/sitemap.xml
+  // 3. Ensure zero unnecessary category page/2 directories exist when totalPages <= 1
+  for (const locale of SUPPORTED_LOCALES) {
+    for (const category of CATEGORY_IDS) {
+      const posts = getPostsByCategory(locale, category);
+      const totalPages = Math.ceil(posts.length / 6);
+      if (totalPages <= 1) {
+        const page2Path =
+          locale === 'en'
+            ? path.join(DIST_DIR, 'category', category, 'page', '2', 'index.html')
+            : path.join(DIST_DIR, locale, 'category', category, 'page', '2', 'index.html');
+        if (fs.existsSync(page2Path)) {
+          errors.push(`Unnecessary empty paginated route generated: ${path.relative(DIST_DIR, page2Path)}`);
+        }
+      }
+    }
+  }
+
+  // 4. Ensure draft entries do NOT appear in dist/ or dist/sitemap.xml
   const allEntries = loadAllBlogEntries(true);
   const draftEntries = allEntries.filter(
     (e) => e.data.status !== 'published' || e.data.noindex
@@ -60,6 +86,9 @@ function main() {
   const sitemapContent = fs.existsSync(sitemapPath)
     ? fs.readFileSync(sitemapPath, 'utf-8')
     : '';
+  const sitemapLocs = new Set(
+    [...sitemapContent.matchAll(/<loc>([^<]+)<\/loc>/gi)].map((m) => m[1])
+  );
 
   for (const draft of draftEntries) {
     const slug = draft.data.slug;
@@ -75,9 +104,11 @@ function main() {
     }
   }
 
-  // 4. Inspect every built HTML page for <html lang>, canonical tag, and reciprocal hreflang
+  // 5. Inspect every built HTML page for <html lang>, canonical tag, social images, robots, and reciprocal hreflang
   const htmlFiles = walkHtmlFiles(DIST_DIR);
   const hreflangMap = new Map<string, Map<string, string>>();
+  const noindexUrls = new Set<string>();
+  const indexableUrls = new Set<string>();
 
   for (const file of htmlFiles) {
     const rel = path.relative(DIST_DIR, file);
@@ -103,30 +134,80 @@ function main() {
       errors.push(`Canonical URL in ${rel} does not start with https://blog.ladestack.in/: ${canonicalUrl}`);
     }
 
-    // Collect alternate hreflang tags (skip 404.html which is noindex)
-    if (rel === '404.html') continue;
+    // Check og:image and twitter:image URLs
+    const ogImgMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+    const twitterImgMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]+)"/i);
+    for (const [label, match] of [
+      ['og:image', ogImgMatch],
+      ['twitter:image', twitterImgMatch],
+    ] as const) {
+      if (!match) {
+        errors.push(`Missing ${label} meta tag in ${rel}`);
+        continue;
+      }
+      const imgUrl = match[1];
+      if (imgUrl.endsWith('/')) {
+        errors.push(`${label} in ${rel} has forbidden trailing slash: ${imgUrl}`);
+      }
+      try {
+        const parsed = new URL(imgUrl);
+        const assetDiskPath = path.join(DIST_DIR, parsed.pathname.replace(/^\/+/, ''));
+        if (!fs.existsSync(assetDiskPath) || !fs.statSync(assetDiskPath).isFile()) {
+          errors.push(`${label} in ${rel} points to non-existent asset in dist/: ${imgUrl}`);
+        }
+      } catch {
+        errors.push(`${label} in ${rel} is not a valid absolute URL: ${imgUrl}`);
+      }
+    }
+
+    // Check robots directive
+    const robotsMatch = html.match(/<meta[^>]*name="robots"[^>]*content="([^"]+)"/i);
+    const isNoindex = robotsMatch ? robotsMatch[1].toLowerCase().includes('noindex') : false;
+
     const altMatches = [
       ...html.matchAll(
         /<link[^>]*rel="alternate"[^>]*hreflang="([^"]+)"[^>]*href="([^"]+)"/gi
       ),
     ];
-    if (altMatches.length > 0) {
-      const map = new Map<string, string>();
-      for (const m of altMatches) {
-        map.set(m[1], m[2]);
+
+    if (rel === '404.html') continue;
+
+    if (isNoindex) {
+      noindexUrls.add(canonicalUrl);
+      if (altMatches.length > 0) {
+        errors.push(`Noindex page ${rel} (${canonicalUrl}) must not emit hreflang alternate links (found ${altMatches.length}).`);
       }
-      hreflangMap.set(canonicalUrl, map);
+      if (sitemapLocs.has(canonicalUrl)) {
+        errors.push(`Noindex page ${rel} (${canonicalUrl}) must not appear in dist/sitemap.xml.`);
+      }
+    } else {
+      indexableUrls.add(canonicalUrl);
+      if (!sitemapLocs.has(canonicalUrl)) {
+        errors.push(`Indexable page ${rel} (${canonicalUrl}) is missing from dist/sitemap.xml.`);
+      }
+      if (altMatches.length > 0) {
+        const map = new Map<string, string>();
+        for (const m of altMatches) {
+          map.set(m[1], m[2]);
+        }
+        hreflangMap.set(canonicalUrl, map);
+      }
     }
   }
 
-  // Verify reciprocity across built HTML files
+  // 6. Verify reciprocity across built HTML files and ensure no hreflang points to a noindex page
   for (const [sourceUrl, alternates] of hreflangMap.entries()) {
     for (const [lang, targetUrl] of alternates.entries()) {
+      if (noindexUrls.has(targetUrl)) {
+        errors.push(
+          `Hreflang on ${sourceUrl} (${lang}) points to a noindex page: ${targetUrl}`
+        );
+      }
       if (lang === 'x-default') continue;
       const targetAlternates = hreflangMap.get(targetUrl);
       if (!targetAlternates) {
         errors.push(
-          `Built HTML hreflang target ${targetUrl} (referenced from ${sourceUrl}) has no corresponding built HTML page`
+          `Built HTML hreflang target ${targetUrl} (referenced from ${sourceUrl}) has no corresponding indexable HTML page with hreflang`
         );
         continue;
       }
@@ -148,7 +229,7 @@ function main() {
   }
 
   console.log(
-    `[verify:output] Audited ${htmlFiles.length} built HTML pages, sitemap.xml, rss.xml, and 9 Pagefind locale indexes with 0 errors.`
+    `[verify:output] Audited ${htmlFiles.length} built HTML pages (${indexableUrls.size} indexable, ${noindexUrls.size} noindex), sitemap.xml (${sitemapLocs.size} URLs), rss.xml, social preview PNGs, and official Pagefind index with 0 errors.`
   );
 }
 

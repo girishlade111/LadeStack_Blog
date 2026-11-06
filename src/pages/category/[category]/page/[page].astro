@@ -13,7 +13,7 @@ export function getStaticPaths() {
   for (const categoryId of CATEGORY_IDS) {
     const total = getCategoryPosts(categoryId, 'en').length;
     const totalPages = Math.ceil(total / SITE_CONFIG.postsPerPage);
-    for (let page = 2; page <= Math.max(2, totalPages); page++) {
+    for (let page = 2; page <= totalPages; page++) {
       paths.push({
         params: { category: categoryId, page: String(page) },
         props: { categoryId, page },
