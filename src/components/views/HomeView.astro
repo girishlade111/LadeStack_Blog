@@ -15,7 +15,7 @@ import {
   getCategoryPosts,
 } from '../../lib/posts';
 import { buildLocaleSwitchOptions } from '../../lib/translations';
-import { buildStaticPageAlternates } from '../../lib/seo';
+import { buildStaticPageAlternates, buildWebsiteJsonLd } from '../../lib/seo';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ArticleCard from '../editorial/ArticleCard.astro';
 
@@ -35,6 +35,7 @@ const editorsPicks = allPosts.filter((p) => p.data.featured).slice(0, 3);
 const canonicalPath = getHomeUrl(locale);
 const alternates = buildStaticPageAlternates((loc) => getHomeUrl(loc));
 const localeOptions = buildLocaleSwitchOptions(locale, { staticRoute: 'home' });
+const jsonLd = buildWebsiteJsonLd(locale, dict.siteTagline);
 
 const featuredCategoryMeta = featuredPost
   ? getCategoryMeta(featuredPost.data.category, locale)
@@ -51,6 +52,7 @@ const featuredAuthor = featuredPost
   canonicalPath={canonicalPath}
   alternates={alternates}
   localeOptions={localeOptions}
+  jsonLd={jsonLd}
 >
   <section class="editorial-masthead">
     <div class="container">

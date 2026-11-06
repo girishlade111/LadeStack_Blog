@@ -12,6 +12,9 @@
     "preview": "astro preview --host 0.0.0.0 --port 3000",
     "validate:content": "node --import tsx scripts/validate-content.ts",
     "verify:seo": "node --import tsx scripts/verify-seo.ts",
+    "verify:output": "node --import tsx scripts/audit-output.ts",
+    "verify:links": "node --import tsx scripts/audit-links.ts",
+    "check": "npm run lint && npm run verify:seo",
     "lint": "node --import tsx scripts/validate-content.ts && tsc --noEmit",
     "test": "npx --yes tsx --test src/lib/blog.test.ts"
   },

@@ -1,0 +1,35 @@
+---
+import { NON_DEFAULT_LOCALES, type Locale } from '../../../../data/locales';
+import { SITE_CONFIG } from '../../../../data/site';
+import { getPublishedPosts } from '../../../../lib/posts';
+import ArticlesArchiveView from '../../../../components/views/ArticlesArchiveView.astro';
+
+export function getStaticPaths() {
+  const paths: {
+    params: { locale: Locale; page: string };
+    props: { locale: Locale; pageNumber: number };
+  }[] = [];
+
+  for (const locale of NON_DEFAULT_LOCALES) {
+    const posts = getPublishedPosts(locale);
+    const totalPages = Math.max(1, Math.ceil(posts.length / SITE_CONFIG.postsPerPage));
+    for (let p = 2; p <= totalPages; p++) {
+      paths.push({
+        params: { locale, page: String(p) },
+        props: { locale, pageNumber: p },
+      });
+    }
+  }
+
+  return paths;
+}
+
+interface Props {
+  locale: Locale;
+  pageNumber: number;
+}
+
+const { locale, pageNumber } = Astro.props;
+---
+
+<ArticlesArchiveView locale={locale} currentPage={pageNumber} />

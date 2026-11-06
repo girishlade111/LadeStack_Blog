@@ -92,3 +92,44 @@ export function buildBreadcrumbJsonLd(
     })),
   };
 }
+
+export function buildWebsiteJsonLd(
+  locale: Locale,
+  description: string
+): Record<string, unknown>[] {
+  const homeUrl = buildCanonicalUrl(locale === 'en' ? '/' : `/${locale}/`);
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: SITE_CONFIG.name,
+      url: SITE_CONFIG.origin,
+      parentOrganization: {
+        '@type': 'Organization',
+        name: SITE_CONFIG.parentBrand,
+        url: SITE_CONFIG.parentUrl,
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: SITE_CONFIG.name,
+      url: homeUrl,
+      inLanguage: locale,
+      description,
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Blog',
+      name: SITE_CONFIG.name,
+      url: homeUrl,
+      inLanguage: locale,
+      description,
+      publisher: {
+        '@type': 'Organization',
+        name: SITE_CONFIG.name,
+        url: SITE_CONFIG.origin,
+      },
+    },
+  ];
+}

@@ -88,7 +88,7 @@ const localeInfo = LOCALE_REGISTRY[locale];
           class="dropdown-summary"
           aria-label={`${dict.localeSwitcherLabel}: ${localeInfo.nativeName}`}
         >
-          <span>{localeInfo.nativeName}</span>
+          <span class="locale-native-label">{localeInfo.nativeName}</span>
           <span class="locale-code-tag">{locale.toUpperCase()}</span>
         </summary>
         <div class="dropdown-panel locale-dropdown-panel" role="region" aria-label={dict.localeSwitcherLabel}>
@@ -130,6 +130,32 @@ const localeInfo = LOCALE_REGISTRY[locale];
       >
         <span data-theme-text>{dict.themeSystem}</span>
       </button>
+
+      <details class="dropdown-details mobile-nav-details" data-nav-dropdown>
+        <summary class="dropdown-summary" aria-label={dict.navCategories}>
+          <span>≡</span>
+        </summary>
+        <div class="dropdown-panel mobile-nav-panel" role="region" aria-label="Mobile Navigation">
+          <div class="mobile-nav-primary">
+            <a href={getArticlesUrl(locale)} class="mobile-nav-link">{dict.navArticles}</a>
+            <a href={getAboutUrl(locale)} class="mobile-nav-link">{dict.navAbout}</a>
+          </div>
+          <div class="mobile-nav-divider" aria-hidden="true"></div>
+          <div class="mobile-nav-heading">{dict.navCategories} (19)</div>
+          <div class="mobile-categories-grid">
+            {
+              CATEGORY_IDS.map((catId) => {
+                const meta = getCategoryMeta(catId, locale);
+                return (
+                  <a href={getCategoryUrl(locale, catId)} class="category-menu-item">
+                    <span>{meta.label}</span>
+                  </a>
+                );
+              })
+            }
+          </div>
+        </div>
+      </details>
     </div>
   </div>
 </header>

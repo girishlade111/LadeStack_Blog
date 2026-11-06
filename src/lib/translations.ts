@@ -1,6 +1,7 @@
 import { SUPPORTED_LOCALES, type Locale } from '../data/locales';
 import { getPostUrl, getHomeUrl } from '../i18n/urls';
 import { loadAllBlogEntries } from './content-loader';
+import { getTagPosts } from './posts';
 import type { BlogEntry } from './validators';
 
 export interface TranslationVariantInfo {
@@ -91,7 +92,13 @@ export function buildLocaleSwitchOptions(
     } else if (options.categorySlug) {
       href = `${prefix}/category/${options.categorySlug}/`;
     } else if (options.tagSlug) {
-      href = `${prefix}/tags/${encodeURIComponent(options.tagSlug)}/`;
+      if (getTagPosts(options.tagSlug, locale).length > 0) {
+        href = `${prefix}/tags/${encodeURIComponent(options.tagSlug)}/`;
+        isAvailableArticleVariant = true;
+      } else {
+        href = getHomeUrl(locale);
+        isAvailableArticleVariant = false;
+      }
     } else if (options.staticRoute && options.staticRoute !== 'home') {
       href = `${prefix}/${options.staticRoute}/`;
     }

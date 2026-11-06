@@ -1,0 +1,28 @@
+---
+import { SITE_CONFIG } from '../../../data/site';
+import { getPublishedPosts } from '../../../lib/posts';
+import ArticlesArchiveView from '../../../components/views/ArticlesArchiveView.astro';
+
+export function getStaticPaths() {
+  const posts = getPublishedPosts('en');
+  const totalPages = Math.max(1, Math.ceil(posts.length / SITE_CONFIG.postsPerPage));
+  const paths: { params: { page: string }; props: { pageNumber: number } }[] = [];
+
+  for (let p = 2; p <= totalPages; p++) {
+    paths.push({
+      params: { page: String(p) },
+      props: { pageNumber: p },
+    });
+  }
+
+  return paths;
+}
+
+interface Props {
+  pageNumber: number;
+}
+
+const { pageNumber } = Astro.props;
+---
+
+<ArticlesArchiveView locale="en" currentPage={pageNumber} />

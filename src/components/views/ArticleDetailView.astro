@@ -303,8 +303,10 @@ const jsonLd = [
           var isMatch = link.getAttribute('data-toc-link') === slug;
           if (isMatch) {
             link.setAttribute('data-active', 'true');
+            link.setAttribute('aria-current', 'location');
           } else {
             link.removeAttribute('data-active');
+            link.removeAttribute('aria-current');
           }
         });
       }
